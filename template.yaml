@@ -1,15 +1,15 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
 Description: >
-  simple-websockets-chat-app
+  rgempad-backend
 
-  SAM Template for simple-websockets-chat-app that has the DynamoDB table and Lambda
+  SAM Template for rgempad-backend that has the DynamoDB table and Lambda
   functions needed to demonstrate the Websocket protocol on API Gateway.
 
 Parameters:
   TableName:
     Type: String
-    Default: "simplechat_connections"
+    Default: "rgempad_connections"
     Description: (Required) The name of the new DynamoDB to store connection identifiers for each connected clients. Minimum 3 characters
     MinLength: 3
     MaxLength: 50
@@ -18,18 +18,21 @@ Parameters:
 
 Resources:
 
-  SimpleChatWebSocket:
+  RGempadBackendApi:
     Type: AWS::ApiGatewayV2::Api
     Properties:
-      Name: SimpleChatWebSocket
+      Name: RGempadBackendApi
       ProtocolType: WEBSOCKET
-      RouteSelectionExpression: "$request.body.action"
+      # The route selection expression determines how the API Gateway selects the route to invoke based on the request.
+      # In this case, we use the request body to determine the route.
+      # The expression "$request.body.type" means that the API Gateway will look for a "type" field in the JSON body of the request to determine which route to invoke.
+      RouteSelectionExpression: "$request.body.type"
 
 #######
   ConnectRoute:
     Type: AWS::ApiGatewayV2::Route
     Properties:
-      ApiId: !Ref SimpleChatWebSocket
+      ApiId: !Ref RGempadBackendApi
       RouteKey: $connect
       AuthorizationType: NONE
       OperationName: ConnectRoute
@@ -40,7 +43,7 @@ Resources:
   ConnectInteg:
     Type: AWS::ApiGatewayV2::Integration
     Properties:
-      ApiId: !Ref SimpleChatWebSocket
+      ApiId: !Ref RGempadBackendApi
       Description: Connect Integration
       IntegrationType: AWS_PROXY
       IntegrationUri:
@@ -50,7 +53,7 @@ Resources:
   DisconnectRoute:
     Type: AWS::ApiGatewayV2::Route
     Properties:
-      ApiId: !Ref SimpleChatWebSocket
+      ApiId: !Ref RGempadBackendApi
       RouteKey: $disconnect
       AuthorizationType: NONE
       OperationName: DisconnectRoute
@@ -61,7 +64,7 @@ Resources:
   DisconnectInteg:
     Type: AWS::ApiGatewayV2::Integration
     Properties:
-      ApiId: !Ref SimpleChatWebSocket
+      ApiId: !Ref RGempadBackendApi
       Description: Disconnect Integration
       IntegrationType: AWS_PROXY
       IntegrationUri:
@@ -69,35 +72,37 @@ Resources:
 
 
 #######
-  SendRoute:
+  ToggleRoute:
     Type: AWS::ApiGatewayV2::Route
     Properties:
-      ApiId: !Ref SimpleChatWebSocket
-      RouteKey: sendmessage
+      ApiId: !Ref RGempadBackendApi
+      # The RouteKey is used to match the incoming request to this route.
+      # E.g. we expect a request with $request.body.type == "toggle" to trigger the ToggleRoute.
+      RouteKey: toggle
       AuthorizationType: NONE
-      OperationName: SendRoute
+      OperationName: ToggleRoute
       Target: !Join
         - "/"
         - - "integrations"
-          - !Ref SendInteg
-  SendInteg:
+          - !Ref ToggleInteg
+  ToggleInteg:
     Type: AWS::ApiGatewayV2::Integration
     Properties:
-      ApiId: !Ref SimpleChatWebSocket
-      Description: Send Integration
+      ApiId: !Ref RGempadBackendApi
+      Description: Toggle Integration
       IntegrationType: AWS_PROXY
       IntegrationUri:
-        Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SendMessageFunction.Arn}/invocations
+        Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${OnToggleFunction.Arn}/invocations
 
 #######
   Deployment:
     Type: AWS::ApiGatewayV2::Deployment
     DependsOn:
       - ConnectRoute
-      - SendRoute
+      - ToggleRoute
       - DisconnectRoute
     Properties:
-      ApiId: !Ref SimpleChatWebSocket
+      ApiId: !Ref RGempadBackendApi
 
 #######
   Stage:
@@ -106,7 +111,7 @@ Resources:
       StageName: Prod
       Description: Prod Stage
       DeploymentId: !Ref Deployment
-      ApiId: !Ref SimpleChatWebSocket
+      ApiId: !Ref RGempadBackendApi
 
 #######
   ConnectionsTable:
@@ -143,7 +148,7 @@ Resources:
   OnConnectPermission:
     Type: AWS::Lambda::Permission
     DependsOn:
-      - SimpleChatWebSocket
+      - RGempadBackendApi
     Properties:
       Action: lambda:InvokeFunction
       FunctionName: !Ref OnConnectFunction
@@ -167,17 +172,22 @@ Resources:
   OnDisconnectPermission:
     Type: AWS::Lambda::Permission
     DependsOn:
-      - SimpleChatWebSocket
+      - RGempadBackendApi
     Properties:
       Action: lambda:InvokeFunction
       FunctionName: !Ref OnDisconnectFunction
       Principal: apigateway.amazonaws.com
 
 #######
-  SendMessageFunction:
+  OnToggleFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: sendmessage/
+      # The CodeUri points to the directory where the Lambda function code is located.
+      # This directory should contain an app.js file with the handler function.
+      # The Handler specifies the entry point for the Lambda function.
+      # In this case, it is app.handler, which means the handler function is exported from
+      # the app.js file in the ontoggle directory. 
+      CodeUri: ontoggle/
       Handler: app.handler
       MemorySize: 256
       Runtime: nodejs20.x
@@ -192,15 +202,15 @@ Resources:
               Action:
                 - "execute-api:ManageConnections"
               Resource:
-                - !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${SimpleChatWebSocket}/*"
+                - !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${RGempadBackendApi}/*"
 
-  SendMessagePermission:
+  OnTogglePermission:
     Type: AWS::Lambda::Permission
     DependsOn:
-      - SimpleChatWebSocket
+      - RGempadBackendApi
     Properties:
       Action: lambda:InvokeFunction
-      FunctionName: !Ref SendMessageFunction
+      FunctionName: !Ref OnToggleFunction
       Principal: apigateway.amazonaws.com
 
 Outputs:
@@ -216,9 +226,9 @@ Outputs:
     Description: "OnDisconnect function ARN"
     Value: !GetAtt OnDisconnectFunction.Arn
 
-  SendMessageFunctionArn:
-    Description: "SendMessage function ARN"
-    Value: !GetAtt SendMessageFunction.Arn
+  OnToggleFunctionArn:
+    Description: "OnToggle function ARN"
+    Value: !GetAtt OnToggleFunction.Arn
 
   WebSocketURI:
     Description: "The WSS Protocol URI to connect to"
@@ -227,7 +237,7 @@ Outputs:
         "",
         [
           "wss://",
-          !Ref SimpleChatWebSocket,
+          !Ref RGempadBackendApi,
           ".execute-api.",
           !Ref "AWS::Region",
           ".amazonaws.com/",

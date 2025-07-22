@@ -14,15 +14,20 @@ const { TABLE_NAME } = process.env;
 export const handler = async (event) => {
   
   // Note that we expecta JSON body with:
-  //  { "action": "sendmessage", "data": ${message} }
-  // where the "action" key "sendmessage" is define as the AWS::ApiGatewayV2::Route
-  // selection expression in the template.yaml file
+  //  { "type": "toggle", "buttonIndex": 0-15 }
+  // The "type" field is used to route the request to this handler, per the RouteSelectionExpression in the API Gateway configuration.
+  // "toggle" is the route key that matches this handler, per the ToggleRoute RouteKey in the template.yaml file.
 
+  // console.log("Received event:", JSON.stringify(event, null, 2));
+
+  const buttonIndex = JSON.parse(event.body).buttonIndex;
+  const postData = "toggle:" + buttonIndex;
+
+  // Scans the DynamoDB table for the connection IDs of all connected clients.
   const scanCmd = new ScanCommand({ TableName: TABLE_NAME, ProjectionExpression: 'connectionId' });
-
-  let connectionData;
+  let connectedClients;
   try {
-    connectionData = await docClient.send(scanCmd);
+    connectedClients = await docClient.send(scanCmd);
   } catch (e) {
     return { statusCode: 500, body: e.stack };
   }
@@ -32,13 +37,13 @@ export const handler = async (event) => {
     endpoint: `https://${event.requestContext.apiId}.execute-api.${process.env.AWS_REGION}.amazonaws.com/${event.requestContext.stage}`
   });
   
-  const postData = JSON.parse(event.body).data;
-  
-  const postCalls = connectionData.Items.map(async ({ connectionId }) => {
+  const postCalls = connectedClients.Items.map(async ({ connectionId }) => {
     try {
       const postCmd = new PostToConnectionCommand({ ConnectionId: connectionId, Data: postData });
       await apigwManagementApi.send(postCmd);
     } catch (e) {
+
+      // If the connection is stale (e.g., the client has disconnected), we delete it from the DynamoDB table
       if (e.statusCode === 410) {
         
         console.log(`Found stale connection, deleting ${connectionId}`);
@@ -57,6 +62,7 @@ export const handler = async (event) => {
       }
     }
   });
+  
   
   try {
     await Promise.all(postCalls);

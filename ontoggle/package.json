@@ -1,7 +1,7 @@
 {
-  "name": "send-message",
+  "name": "on-toggle",
   "version": "1.0.0",
-  "description": "sendmessage example for WebSockets on API Gateway",
+  "description": "on-toggle lambda function handler for rgempad WebSockets backend",
   "main": "src/app.js",
   "author": "SAM CLI",
   "license": "MIT",

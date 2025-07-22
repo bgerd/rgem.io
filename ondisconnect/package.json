@@ -1,7 +1,7 @@
 {
   "name": "on-disconnect",
   "version": "1.0.0",
-  "description": "ondisconnect example for WebSockets on API Gateway",
+  "description": "on-disconnect lambda function handler for rgempad WebSockets backend",
   "main": "src/app.js",
   "author": "SAM CLI",
   "license": "MIT",
