@@ -16,7 +16,7 @@ const ddb = new DynamoDBClient({ region: process.env.AWS_REGION });
 export const handler = async (event) => {
   
   const deleteParams = {
-    TableName: process.env.TABLE_NAME,
+    TableName: process.env.CONNECTIONS_TABLE,
     Key: {
       connectionId: { S: event.requestContext.connectionId }
     }

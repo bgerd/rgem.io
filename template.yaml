@@ -1,4 +1,6 @@
 AWSTemplateFormatVersion: "2010-09-09"
+
+# NOTE. Enables SAM shorthand for any AWS::Serverless::* resources
 Transform: AWS::Serverless-2016-10-31
 Description: >
   rgempad-backend
@@ -6,18 +8,20 @@ Description: >
   SAM Template for rgempad-backend that has the DynamoDB table and Lambda
   functions needed to demonstrate the Websocket protocol on API Gateway.
 
-Parameters:
-  TableName:
-    Type: String
-    Default: "rgempad_connections"
-    Description: (Required) The name of the new DynamoDB to store connection identifiers for each connected clients. Minimum 3 characters
-    MinLength: 3
-    MaxLength: 50
-    AllowedPattern: ^[A-Za-z_]+$
-    ConstraintDescription: "Required. Can be characters and underscore only. No numbers or special characters allowed."
-
 Resources:
 
+# State ######
+  ConnectionsTable:
+    # Holds the connection identifiers for each connected client
+    # NOTE: By default SAM uses PAY_PER_REQUEST billing (on-demand) and enables SSE with an AWS-managed CMK.
+    Type: AWS::Serverless::SimpleTable
+    Properties:
+      TableName: !Sub "${AWS::StackName}-connections-table"
+      PrimaryKey:
+        Name: connectionId
+        Type: String
+
+#######
   RGempadBackendApi:
     Type: AWS::ApiGatewayV2::Api
     Properties:
@@ -114,23 +118,6 @@ Resources:
       ApiId: !Ref RGempadBackendApi
 
 #######
-  ConnectionsTable:
-    Type: AWS::DynamoDB::Table
-    Properties:
-      AttributeDefinitions:
-        - AttributeName: "connectionId"
-          AttributeType: "S"
-      KeySchema:
-        - AttributeName: "connectionId"
-          KeyType: "HASH"
-      ProvisionedThroughput:
-        ReadCapacityUnits: 5
-        WriteCapacityUnits: 5
-      SSESpecification:
-        SSEEnabled: True
-      TableName: !Ref TableName
-
-#######
   OnConnectFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -140,10 +127,10 @@ Resources:
       Runtime: nodejs20.x
       Environment:
         Variables:
-          TABLE_NAME: !Ref TableName
+          CONNECTIONS_TABLE: !Ref ConnectionsTable
       Policies:
         - DynamoDBCrudPolicy:
-            TableName: !Ref TableName
+            TableName: !Ref ConnectionsTable
 
   OnConnectPermission:
     Type: AWS::Lambda::Permission
@@ -164,10 +151,10 @@ Resources:
       Runtime: nodejs20.x
       Environment:
         Variables:
-          TABLE_NAME: !Ref TableName
+          CONNECTIONS_TABLE: !Ref ConnectionsTable
       Policies:
         - DynamoDBCrudPolicy:
-            TableName: !Ref TableName
+            TableName: !Ref ConnectionsTable
 
   OnDisconnectPermission:
     Type: AWS::Lambda::Permission
@@ -193,10 +180,10 @@ Resources:
       Runtime: nodejs20.x
       Environment:
         Variables:
-          TABLE_NAME: !Ref TableName
+          CONNECTIONS_TABLE: !Ref ConnectionsTable
       Policies:
         - DynamoDBCrudPolicy:
-            TableName: !Ref TableName
+            TableName: !Ref ConnectionsTable
         - Statement:
             - Effect: Allow
               Action:

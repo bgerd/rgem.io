@@ -8,7 +8,7 @@ import { ApiGatewayManagementApiClient, PostToConnectionCommand } from "@aws-sdk
 const ddb = new DynamoDBClient({ region: process.env.AWS_REGION });
 const docClient = DynamoDBDocumentClient.from(ddb);
 
-const { TABLE_NAME } = process.env;
+const { CONNECTIONS_TABLE } = process.env;
 
 // ES6 type module syntax
 export const handler = async (event) => {
@@ -24,7 +24,7 @@ export const handler = async (event) => {
   const postData = "toggle:" + buttonIndex;
 
   // Scans the DynamoDB table for the connection IDs of all connected clients.
-  const scanCmd = new ScanCommand({ TableName: TABLE_NAME, ProjectionExpression: 'connectionId' });
+  const scanCmd = new ScanCommand({ TableName: CONNECTIONS_TABLE, ProjectionExpression: 'connectionId' });
   let connectedClients;
   try {
     connectedClients = await docClient.send(scanCmd);
@@ -49,7 +49,7 @@ export const handler = async (event) => {
         console.log(`Found stale connection, deleting ${connectionId}`);
     
         const deleteParams = {
-          TableName: process.env.TABLE_NAME,
+          TableName: process.env.CONNECTIONS_TABLE,
           Key: {
             connectionId: { S: event.requestContext.connectionId }
           }
