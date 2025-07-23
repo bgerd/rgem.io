@@ -1,32 +1,24 @@
-// Copyright 2018-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
-// SPDX-License-Identifier: MIT-0
+import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import { DynamoDBDocumentClient, DeleteCommand } from "@aws-sdk/lib-dynamodb";
 
-// https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-websocket-api-route-keys-connect-disconnect.html
-// The $disconnect route is executed after the connection is closed.
-// The connection can be closed by the server or by the client. As the connection is already closed when it is executed, 
-// $disconnect is a best-effort event. 
-// API Gateway will try its best to deliver the $disconnect event to your integration, but it cannot guarantee delivery.
+const ddbClient = new DynamoDBClient({ region: process.env.AWS_REGION });
+const ddbDocClient = DynamoDBDocumentClient.from(ddbClient);
 
-import { DynamoDBClient, DeleteItemCommand } from "@aws-sdk/client-dynamodb";
+const { CONNECTIONS_TABLE } = process.env;
 
-const ddb = new DynamoDBClient({ region: process.env.AWS_REGION });
-
-
-// ES6 type module syntax
 export const handler = async (event) => {
-  
   const deleteParams = {
-    TableName: process.env.CONNECTIONS_TABLE,
+    TableName: CONNECTIONS_TABLE,
     Key: {
-      connectionId: { S: event.requestContext.connectionId }
+      connectionId: event.requestContext.connectionId
     }
   };
-  const delCmd = new DeleteItemCommand(deleteParams);
+  const delCmd = new DeleteCommand(deleteParams);
 
   try {
-    await ddb.send(delCmd);
+    await ddbDocClient.send(delCmd);
   } catch (err) {
-    return { statusCode: 500, body: 'Failed to disconnect: ' + JSON.stringify(err) };
+    return { statusCode: 500, body: 'Failed to delete from CONNECTIONS_TABLE: ' + JSON.stringify(err) };
   }
 
   return { statusCode: 200, body: 'Disconnected.' };
