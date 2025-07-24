@@ -1,9 +1,0 @@
-{
-  "name": "on-connect",
-  "version": "1.0.0",
-  "description": "on-connect lambda function handler for rgempad WebSockets backend",
-  "main": "src/app.js",
-  "author": "SAM CLI",
-  "license": "MIT",
-  "type": "module"
-}

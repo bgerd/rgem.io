@@ -12,7 +12,7 @@ Resources:
 
 # State ######
   ConnectionsTable:
-    # Holds the connection identifiers for each connected client
+    # Holds the connection identifiers to set identifiers for each connected client
     # NOTE: By default SAM uses PAY_PER_REQUEST billing (on-demand) and enables SSE with an AWS-managed CMK.
     Type: AWS::Serverless::SimpleTable
     Properties:
@@ -21,14 +21,14 @@ Resources:
         Name: connectionId
         Type: String
 
-  GridStateTable:
-    # Holds the 16-bit grid state for each “set”
+  GemStateTable:
+    # Holds the 16-bit gem state for each gemId
     # NOTE: By default SAM uses PAY_PER_REQUEST billing (on-demand) and enables SSE with an AWS-managed CMK.
     Type: AWS::Serverless::SimpleTable
     Properties:
-      TableName: !Sub "${AWS::StackName}-grid-state-table"
+      TableName: !Sub "${AWS::StackName}-gem-state-table"
       PrimaryKey:
-        Name: setId
+        Name: gemId
         Type: String
 
 #######
@@ -41,48 +41,6 @@ Resources:
       # In this case, we use the request body to determine the route.
       # The expression "$request.body.type" means that the API Gateway will look for a "type" field in the JSON body of the request to determine which route to invoke.
       RouteSelectionExpression: "$request.body.type"
-
-#######
-  ConnectRoute:
-    Type: AWS::ApiGatewayV2::Route
-    Properties:
-      ApiId: !Ref RGempadBackendApi
-      RouteKey: $connect
-      AuthorizationType: NONE
-      OperationName: ConnectRoute
-      Target: !Join
-        - "/"
-        - - "integrations"
-          - !Ref ConnectInteg
-  ConnectInteg:
-    Type: AWS::ApiGatewayV2::Integration
-    Properties:
-      ApiId: !Ref RGempadBackendApi
-      Description: Connect Integration
-      IntegrationType: AWS_PROXY
-      IntegrationUri:
-        Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${OnConnectFunction.Arn}/invocations
-
-#######
-  DisconnectRoute:
-    Type: AWS::ApiGatewayV2::Route
-    Properties:
-      ApiId: !Ref RGempadBackendApi
-      RouteKey: $disconnect
-      AuthorizationType: NONE
-      OperationName: DisconnectRoute
-      Target: !Join
-        - "/"
-        - - "integrations"
-          - !Ref DisconnectInteg
-  DisconnectInteg:
-    Type: AWS::ApiGatewayV2::Integration
-    Properties:
-      ApiId: !Ref RGempadBackendApi
-      Description: Disconnect Integration
-      IntegrationType: AWS_PROXY
-      IntegrationUri:
-        Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${OnDisconnectFunction.Arn}/invocations
 
 #######
   HelloRoute:
@@ -131,13 +89,33 @@ Resources:
         Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${OnToggleFunction.Arn}/invocations
 
 #######
+  DisconnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref RGempadBackendApi
+      RouteKey: $disconnect
+      AuthorizationType: NONE
+      OperationName: DisconnectRoute
+      Target: !Join
+        - "/"
+        - - "integrations"
+          - !Ref DisconnectInteg
+  DisconnectInteg:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref RGempadBackendApi
+      Description: Disconnect Integration
+      IntegrationType: AWS_PROXY
+      IntegrationUri:
+        Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${OnDisconnectFunction.Arn}/invocations
+
+#######
   Deployment:
     Type: AWS::ApiGatewayV2::Deployment
     DependsOn:
-      - ConnectRoute
-      - DisconnectRoute
       - HelloRoute
       - ToggleRoute
+      - DisconnectRoute
     Properties:
       ApiId: !Ref RGempadBackendApi
 
@@ -151,54 +129,6 @@ Resources:
       ApiId: !Ref RGempadBackendApi
 
 #######
-  OnConnectFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: onconnect/
-      Handler: app.handler
-      MemorySize: 256
-      Runtime: nodejs20.x
-      Environment:
-        Variables:
-          CONNECTIONS_TABLE: !Ref ConnectionsTable
-      Policies:
-        - DynamoDBCrudPolicy:
-            TableName: !Ref ConnectionsTable
-
-  OnConnectPermission:
-    Type: AWS::Lambda::Permission
-    DependsOn:
-      - RGempadBackendApi
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref OnConnectFunction
-      Principal: apigateway.amazonaws.com
-
-#######
-  OnDisconnectFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: ondisconnect/
-      Handler: app.handler
-      MemorySize: 256
-      Runtime: nodejs20.x
-      Environment:
-        Variables:
-          CONNECTIONS_TABLE: !Ref ConnectionsTable
-      Policies:
-        - DynamoDBCrudPolicy:
-            TableName: !Ref ConnectionsTable
-
-  OnDisconnectPermission:
-    Type: AWS::Lambda::Permission
-    DependsOn:
-      - RGempadBackendApi
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref OnDisconnectFunction
-      Principal: apigateway.amazonaws.com
-
-#######
   OnHelloFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -208,10 +138,13 @@ Resources:
       Runtime: nodejs20.x
       Environment:
         Variables:
-          GRID_STATE_TABLE: !Ref GridStateTable
+          CONNECTIONS_TABLE: !Ref ConnectionsTable        
+          GEM_STATE_TABLE: !Ref GemStateTable
       Policies:
         - DynamoDBCrudPolicy:
-            TableName: !Ref GridStateTable
+            TableName: !Ref ConnectionsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref GemStateTable
         - Statement:
           - Effect: Allow
             Action:
@@ -238,10 +171,13 @@ Resources:
       Runtime: nodejs20.x
       Environment:
         Variables:
-          CONNECTIONS_TABLE: !Ref ConnectionsTable
+          CONNECTIONS_TABLE: !Ref ConnectionsTable        
+          GEM_STATE_TABLE: !Ref GemStateTable
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref ConnectionsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref GemStateTable
         - Statement:
             - Effect: Allow
               Action:
@@ -258,18 +194,38 @@ Resources:
       FunctionName: !Ref OnToggleFunction
       Principal: apigateway.amazonaws.com
 
+#######
+  OnDisconnectFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ondisconnect/
+      Handler: app.handler
+      MemorySize: 256
+      Runtime: nodejs20.x
+      Environment:
+        Variables:
+          CONNECTIONS_TABLE: !Ref ConnectionsTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ConnectionsTable
+
+  OnDisconnectPermission:
+    Type: AWS::Lambda::Permission
+    DependsOn:
+      - RGempadBackendApi
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref OnDisconnectFunction
+      Principal: apigateway.amazonaws.com
+
 Outputs:
   ConnectionsTableArn:
     Description: "Connections table ARN"
     Value: !GetAtt ConnectionsTable.Arn
 
-  GridStateTableArn:
-    Description: "Grid State table ARN"
-    Value: !GetAtt GridStateTable.Arn
-
-  OnConnectFunctionArn:
-    Description: "OnConnect function ARN"
-    Value: !GetAtt OnConnectFunction.Arn
+  GemStateTableArn:
+    Description: "Gem State table ARN"
+    Value: !GetAtt GemStateTable.Arn
 
   OnDisconnectFunctionArn:
     Description: "OnDisconnect function ARN"

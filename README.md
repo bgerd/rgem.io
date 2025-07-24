@@ -6,7 +6,6 @@ There are three functions contained within the directories and a `SAM` template 
 ```
 .
 ├── README.md                   <-- This instructions file
-├── onconnect                   <-- Source code onconnect
 ├── ondisconnect                <-- Source code ondisconnect
 ├── onhello                     <-- Source code onhello
 ├── ontoggle                    <-- Source code ontoggle
