@@ -50,7 +50,7 @@ Resources:
       # Note: that the route key is "hello" which means that the API Gateway will look for a "type" field in the JSON body
       # of the request with the value "hello" to invoke this route, per the RouteSelectionExpression.
       # WARNING: Changing the RouteKey will require forcing a new deployment.
-      # Td. Learn how to forace a new deployment without having to delete the stack
+      # Td. Learn how to force a new deployment without having to delete the stack
       RouteKey: hello
       AuthorizationType: NONE
       OperationName: HelloRoute
@@ -129,6 +129,28 @@ Resources:
       ApiId: !Ref RGempadBackendApi
 
 #######
+# Heartbeat EventBridge rule
+  HeartbeatScheduleRule:
+    Type: AWS::Events::Rule
+    Properties:
+      # Lower heartbeat rate for testing, production should be 9 minutes
+      Description: "Trigger heartbeat Lambda every 9 minutes"
+      ScheduleExpression: rate(9 minutes)
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt SchedHeartbeatFunction.Arn
+          Id: HeartbeatFunctionTarget
+
+  # Grant invocation permission from Events to Lambda
+  HeartbeatPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref SchedHeartbeatFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt HeartbeatScheduleRule.Arn
+
+##############
   OnHelloFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -161,7 +183,7 @@ Resources:
       FunctionName: !Ref OnHelloFunction
       Principal: apigateway.amazonaws.com
 
-#######
+##############
   OnToggleFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -194,7 +216,40 @@ Resources:
       FunctionName: !Ref OnToggleFunction
       Principal: apigateway.amazonaws.com
 
-#######
+##############
+  SchedHeartbeatFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: schedhb/
+      Handler: app.handler
+      MemorySize: 256
+      Runtime: nodejs20.x
+      Environment:
+        Variables:
+          # Td. Implement this pattern for all Lambda functions
+          # The API endpoint is constructed to ensure it works with a custom domain
+          API_ENDPOINT: !Sub "https://${RGempadBackendApi}.execute-api.${AWS::Region}.amazonaws.com/${Stage}"
+          CONNECTIONS_TABLE: !Ref ConnectionsTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ConnectionsTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - "execute-api:ManageConnections"
+              Resource:
+                - !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${RGempadBackendApi}/*"
+
+  SchedHeartbeatFunctionPermission:
+    Type: AWS::Lambda::Permission
+    DependsOn:
+      - RGempadBackendApi
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref  SchedHeartbeatFunction
+      Principal: apigateway.amazonaws.com
+
+##############
   OnDisconnectFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -227,10 +282,6 @@ Outputs:
     Description: "Gem State table ARN"
     Value: !GetAtt GemStateTable.Arn
 
-  OnDisconnectFunctionArn:
-    Description: "OnDisconnect function ARN"
-    Value: !GetAtt OnDisconnectFunction.Arn
-
   OnHelloFunctionArn:
     Description: "OnHello function ARN"
     Value: !GetAtt OnHelloFunction.Arn
@@ -238,6 +289,14 @@ Outputs:
   OnToggleFunctionArn:
     Description: "OnToggle function ARN"
     Value: !GetAtt OnToggleFunction.Arn
+
+  SchedHeartbeatFunctionArn:
+    Description:  "SchedHeartbeat function ARN"
+    Value: !GetAtt  SchedHeartbeatFunction.Arn
+
+  OnDisconnectFunctionArn:
+    Description: "OnDisconnect function ARN"
+    Value: !GetAtt OnDisconnectFunction.Arn
 
   WebSocketURI:
     Description: "The WSS Protocol URI to connect to"

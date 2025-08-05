@@ -1,0 +1,9 @@
+{
+  "name": "scheduled-heartbeat",
+  "version": "1.0.0",
+  "description": "scheduled-heartbeat lambda function handler for rgempad WebSockets backend",
+  "main": "src/app.js",
+  "author": "SAM CLI",
+  "license": "MIT",
+  "type": "module"
+}

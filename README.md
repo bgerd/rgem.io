@@ -9,6 +9,7 @@ There are three functions contained within the directories and a `SAM` template 
 ├── ondisconnect                <-- Source code ondisconnect
 ├── onhello                     <-- Source code onhello
 ├── ontoggle                    <-- Source code ontoggle
+├── schedhb                     <-- Source code schedhb
 └── template.yaml               <-- SAM template for Lambda Functions and DDB
 ```
 
