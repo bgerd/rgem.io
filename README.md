@@ -50,8 +50,10 @@ $ wscat -c wss://{YOUR-API-ID}.execute-api.{YOUR-REGION}.amazonaws.com/{STAGE}
 ```bash
 $ wscat -c wss://{YOUR-API-ID}.execute-api.{YOUR-REGION}.amazonaws.com/prod
 connected (press CTRL+C to quit)
+> { "type": "hello", "gemId": "default"}
+< { "type":"update", "gemState": ... }
 > { "type": "toggle", "buttonIndex": 0 }
-< toggle:0
+< { "type":"update", "gemState": ... }
 ```
 
 ## License Summary

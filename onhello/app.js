@@ -79,12 +79,12 @@ export const handler = async (event) => {
   }
 
   // 3. Post current gemState to connectionId
-  const apigwManagementApi = new ApiGatewayManagementApiClient({
+  const apiGateway = new ApiGatewayManagementApiClient({
     // The endpoint is intentionally constructed using the API ID and stage from the event to account for custom domains
     endpoint: `https://${event.requestContext.apiId}.execute-api.${AWS_REGION}.amazonaws.com/${event.requestContext.stage}`,
   });
   try {
-    await apigwManagementApi.send(
+    await apiGateway.send(
       new PostToConnectionCommand({
         ConnectionId: connectionId,
         Data: JSON.stringify({

@@ -226,7 +226,7 @@ Resources:
       Runtime: nodejs20.x
       Environment:
         Variables:
-          # Td. Implement this pattern for all Lambda functions
+          # Note: that cannot construct this envar for other functions because of circular dependencies
           # The API endpoint is constructed to ensure it works with a custom domain
           API_ENDPOINT: !Sub "https://${RGempadBackendApi}.execute-api.${AWS::Region}.amazonaws.com/${Stage}"
           CONNECTIONS_TABLE: !Ref ConnectionsTable

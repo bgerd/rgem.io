@@ -9,7 +9,6 @@ import {
   PostToConnectionCommand,
 } from "@aws-sdk/client-apigatewaymanagementapi";
 
-// Td: Implement this pattern for onhello and disconnect handlers
 const { CONNECTIONS_TABLE, API_ENDPOINT, AWS_REGION } = process.env;
 
 const ddbDocClient = DynamoDBDocumentClient.from(new DynamoDBClient({ region: AWS_REGION }));

@@ -120,7 +120,7 @@ export const handler = async (event) => {
   }
 
   // 4. Broadcast the updated gemState to all connected clients
-  const apigwManagementApi = new ApiGatewayManagementApiClient({
+  const apiGateway = new ApiGatewayManagementApiClient({
     // The endpoint is intentionally constructed using the API ID and stage from the event to account for custom domains
     endpoint: `https://${event.requestContext.apiId}.execute-api.${AWS_REGION}.amazonaws.com/${event.requestContext.stage}`,
   });
@@ -133,7 +133,7 @@ export const handler = async (event) => {
           gemState: gemState,
         }),
       });
-      await apigwManagementApi.send(postCmd);
+      await apiGateway.send(postCmd);
     } catch (e) {
       // If the connection is stale (e.g., the client has disconnected), we delete it from the DynamoDB table
       if (e.statusCode === 410) {
