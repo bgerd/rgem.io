@@ -9,11 +9,11 @@ import {
   PostToConnectionCommand,
 } from "@aws-sdk/client-apigatewaymanagementapi";
 
-const { CONNECTIONS_TABLE, API_ENDPOINT, AWS_REGION } = process.env;
+const { CONNECTIONS_TABLE, WS_API_ENDPOINT, AWS_REGION } = process.env;
 
 const ddbDocClient = DynamoDBDocumentClient.from(new DynamoDBClient({ region: AWS_REGION }));
 const apiGateway = new ApiGatewayManagementApiClient({
-  endpoint: API_ENDPOINT,
+  endpoint: WS_API_ENDPOINT,
 });
 
 // Handler for the scheduled heartbeat function

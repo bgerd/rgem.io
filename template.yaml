@@ -95,9 +95,8 @@ Resources:
       Runtime: nodejs20.x
       Environment:
         Variables:
-          # Note: that cannot construct this envar for other functions because of circular dependencies
-          # The API endpoint is constructed to ensure it works with a custom domain
-          API_ENDPOINT: !Sub "https://${RGempadBackendApi}.execute-api.${AWS::Region}.amazonaws.com/${Stage}"
+          # Note: WS_API_ENDPOINT is a reference to the WebSocket API endpoint for functions external to the RGempadWSApi gateway
+          WS_API_ENDPOINT: !Sub "https://${RGempadWSApi}.execute-api.${AWS::Region}.amazonaws.com/${RGempadWSApiStage}"
           CONNECTIONS_TABLE: !Ref ConnectionsTable
           GEM_STATE_TABLE: !Ref GemStateTable
       Policies:
@@ -110,7 +109,7 @@ Resources:
               Action:
                 - "execute-api:ManageConnections"
               Resource:
-                - !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${RGempadBackendApi}/*"
+                - !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${RGempadWSApi}/*"
 
   #######
   GemPostPermission:
@@ -123,10 +122,10 @@ Resources:
       Principal: apigateway.amazonaws.com
 
 ###############################################################
-  RGempadBackendApi:
+  RGempadWSApi:
     Type: AWS::ApiGatewayV2::Api
     Properties:
-      Name: RGempadBackendApi
+      Name: RGempadWSApi
       ProtocolType: WEBSOCKET
       # The route selection expression determines how the API Gateway selects the route to invoke based on the request.
       # In this case, we use the request body to determine the route.
@@ -134,10 +133,29 @@ Resources:
       RouteSelectionExpression: "$request.body.type"
 
 #######
+  RGempadWSApiDeployment:
+    Type: AWS::ApiGatewayV2::Deployment
+    DependsOn:
+      - HelloRoute
+      - ToggleRoute
+      - DisconnectRoute
+    Properties:
+      ApiId: !Ref RGempadWSApi
+
+#######
+  RGempadWSApiStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      StageName: Prod
+      Description: RGempadWSApi Prod Stage
+      DeploymentId: !Ref RGempadWSApiDeployment
+      ApiId: !Ref RGempadWSApi
+
+#######
   HelloRoute:
     Type: AWS::ApiGatewayV2::Route
     Properties:
-      ApiId: !Ref RGempadBackendApi
+      ApiId: !Ref RGempadWSApi
       # Note: that the route key is "hello" which means that the API Gateway will look for a "type" field in the JSON body
       # of the request with the value "hello" to invoke this route, per the RouteSelectionExpression.
       # WARNING: Changing the RouteKey will require forcing a new deployment.
@@ -152,7 +170,7 @@ Resources:
   HelloInteg:
     Type: AWS::ApiGatewayV2::Integration
     Properties:
-      ApiId: !Ref RGempadBackendApi
+      ApiId: !Ref RGempadWSApi
       Description: Hello Integration
       IntegrationType: AWS_PROXY
       IntegrationUri:
@@ -162,7 +180,7 @@ Resources:
   ToggleRoute:
     Type: AWS::ApiGatewayV2::Route
     Properties:
-      ApiId: !Ref RGempadBackendApi
+      ApiId: !Ref RGempadWSApi
       RouteKey: toggle
       AuthorizationType: NONE
       OperationName: ToggleRoute
@@ -173,7 +191,7 @@ Resources:
   ToggleInteg:
     Type: AWS::ApiGatewayV2::Integration
     Properties:
-      ApiId: !Ref RGempadBackendApi
+      ApiId: !Ref RGempadWSApi
       Description: Toggle Integration
       IntegrationType: AWS_PROXY
       IntegrationUri:
@@ -183,7 +201,7 @@ Resources:
   DisconnectRoute:
     Type: AWS::ApiGatewayV2::Route
     Properties:
-      ApiId: !Ref RGempadBackendApi
+      ApiId: !Ref RGempadWSApi
       # Note: that the route key is $disconnect which is a special route invoked when a client disconnects
       RouteKey: $disconnect
       AuthorizationType: NONE
@@ -195,52 +213,11 @@ Resources:
   DisconnectInteg:
     Type: AWS::ApiGatewayV2::Integration
     Properties:
-      ApiId: !Ref RGempadBackendApi
+      ApiId: !Ref RGempadWSApi
       Description: Disconnect Integration
       IntegrationType: AWS_PROXY
       IntegrationUri:
         Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${OnDisconnectFunction.Arn}/invocations
-
-#######
-  Deployment:
-    Type: AWS::ApiGatewayV2::Deployment
-    DependsOn:
-      - HelloRoute
-      - ToggleRoute
-      - DisconnectRoute
-    Properties:
-      ApiId: !Ref RGempadBackendApi
-
-#######
-  Stage:
-    Type: AWS::ApiGatewayV2::Stage
-    Properties:
-      StageName: Prod
-      Description: Prod Stage
-      DeploymentId: !Ref Deployment
-      ApiId: !Ref RGempadBackendApi
-
-#######
-# Heartbeat EventBridge rule
-  HeartbeatScheduleRule:
-    Type: AWS::Events::Rule
-    Properties:
-      # Lower heartbeat rate for testing, production should be 9 minutes
-      Description: "Trigger heartbeat Lambda every 9 minutes"
-      ScheduleExpression: rate(9 minutes)
-      State: ENABLED
-      Targets:
-        - Arn: !GetAtt SchedHeartbeatFunction.Arn
-          Id: HeartbeatFunctionTarget
-
-  # Grant invocation permission from Events to Lambda
-  HeartbeatPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      FunctionName: !Ref SchedHeartbeatFunction
-      Action: lambda:InvokeFunction
-      Principal: events.amazonaws.com
-      SourceArn: !GetAtt HeartbeatScheduleRule.Arn
 
 ##############
   OnHelloFunction:
@@ -264,12 +241,12 @@ Resources:
             Action:
               - "execute-api:ManageConnections"
             Resource:
-              - !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${RGempadBackendApi}/*"
+              - !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${RGempadWSApi}/*"
 
   OnHelloPermission:
     Type: AWS::Lambda::Permission
     DependsOn:
-      - RGempadBackendApi
+      - RGempadWSApi
     Properties:
       Action: lambda:InvokeFunction
       FunctionName: !Ref OnHelloFunction
@@ -297,12 +274,12 @@ Resources:
               Action:
                 - "execute-api:ManageConnections"
               Resource:
-                - !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${RGempadBackendApi}/*"
+                - !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${RGempadWSApi}/*"
 
   OnTogglePermission:
     Type: AWS::Lambda::Permission
     DependsOn:
-      - RGempadBackendApi
+      - RGempadWSApi
     Properties:
       Action: lambda:InvokeFunction
       FunctionName: !Ref OnToggleFunction
@@ -326,11 +303,33 @@ Resources:
   OnDisconnectPermission:
     Type: AWS::Lambda::Permission
     DependsOn:
-      - RGempadBackendApi
+      - RGempadWSApi
     Properties:
       Action: lambda:InvokeFunction
       FunctionName: !Ref OnDisconnectFunction
       Principal: apigateway.amazonaws.com
+
+###############################################################
+# Heartbeat EventBridge rule
+  HeartbeatScheduleRule:
+    Type: AWS::Events::Rule
+    Properties:
+      # Lower heartbeat rate for testing, production should be 9 minutes
+      Description: "Trigger heartbeat Lambda every 9 minutes"
+      ScheduleExpression: rate(9 minutes)
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt SchedHeartbeatFunction.Arn
+          Id: HeartbeatFunctionTarget
+
+  # Grant invocation permission from Events to Lambda
+  HeartbeatPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref SchedHeartbeatFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt HeartbeatScheduleRule.Arn
 
 ##############
   SchedHeartbeatFunction:
@@ -342,9 +341,8 @@ Resources:
       Runtime: nodejs20.x
       Environment:
         Variables:
-          # Note: that cannot construct this envar for other functions because of circular dependencies
-          # The API endpoint is constructed to ensure it works with a custom domain
-          API_ENDPOINT: !Sub "https://${RGempadBackendApi}.execute-api.${AWS::Region}.amazonaws.com/${Stage}"
+          # Note this is a reference to the WebSocket API endpoint for functions external to that gateway
+          WS_API_ENDPOINT: !Sub "https://${RGempadWSApi}.execute-api.${AWS::Region}.amazonaws.com/${RGempadWSApiStage}"
           CONNECTIONS_TABLE: !Ref ConnectionsTable
       Policies:
         - DynamoDBCrudPolicy:
@@ -354,12 +352,12 @@ Resources:
               Action:
                 - "execute-api:ManageConnections"
               Resource:
-                - !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${RGempadBackendApi}/*"
+                - !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${RGempadWSApi}/*"
 
   SchedHeartbeatFunctionPermission:
     Type: AWS::Lambda::Permission
     DependsOn:
-      - RGempadBackendApi
+      - RGempadWSApi
     Properties:
       Action: lambda:InvokeFunction
       FunctionName: !Ref  SchedHeartbeatFunction
@@ -398,11 +396,11 @@ Outputs:
         "",
         [
           "wss://",
-          !Ref RGempadBackendApi,
+          !Ref RGempadWSApi,
           ".execute-api.",
           !Ref "AWS::Region",
           ".amazonaws.com/",
-          !Ref "Stage",
+          !Ref "RGempadWSApiStage",
         ],
       ]
 

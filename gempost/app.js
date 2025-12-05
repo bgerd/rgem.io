@@ -13,12 +13,12 @@ import {
   PostToConnectionCommand,
 } from "@aws-sdk/client-apigatewaymanagementapi";
 
-const { CONNECTIONS_TABLE, GEM_STATE_TABLE, API_ENDPOINT, AWS_REGION } = process.env;
+const { CONNECTIONS_TABLE, GEM_STATE_TABLE, WS_API_ENDPOINT, AWS_REGION } = process.env;
 
 const ddbClient = new DynamoDBClient({ region: AWS_REGION });
 const ddbDocClient = DynamoDBDocumentClient.from(ddbClient);
 const websocketApiGateway = new ApiGatewayManagementApiClient({
-  endpoint: API_ENDPOINT,
+  endpoint: WS_API_ENDPOINT,
 });
 
 /* TEST ECHO with curl:
