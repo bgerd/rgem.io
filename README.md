@@ -74,3 +74,5 @@ All websocket connected and subscribed to `<gemId>` should receive the following
 ```
 < { "type":"update", "gemState":<gemState> }
 ```
+
+Note that `https://{RGempadHttpApi-ID}.execute-api.{YOUR-REGION}.amazonaws.com/Prod` and `wss://{RGempadWSApi-ID}.execute-api.{YOUR-REGION}.amazonaws.com/Prod` are also mapped to `https://api.rgem.io` and `wss://ws.rgem.io` respectively
