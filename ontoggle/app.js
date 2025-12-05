@@ -111,11 +111,11 @@ export const handler = async (event) => {
         ProjectionExpression: "connectionId",
       })
     );
-  } catch (e) {
-    console.log("Failed to scan CONNECTIONS_TABLE:", e);
+  } catch (err) {
+    console.log("Failed to scan CONNECTIONS_TABLE:", err);
     return {
       statusCode: 500,
-      body: "Failed to scan CONNECTIONS_TABLE: " + JSON.stringify(e),
+      body: "Failed to scan CONNECTIONS_TABLE: " + JSON.stringify(err),
     };
   }
 
@@ -134,9 +134,9 @@ export const handler = async (event) => {
         }),
       });
       await apiGateway.send(postCmd);
-    } catch (e) {
+    } catch (err) {
       // If the connection is stale (e.g., the client has disconnected), we delete it from the DynamoDB table
-      if (e.statusCode === 410) {
+      if (err.statusCode === 410) {
         console.log(`Found stale connection, deleting ${connectionId}`);
         await ddbDocClient.send(
           new DeleteCommand({
@@ -148,15 +148,15 @@ export const handler = async (event) => {
         );
       } else {
         console.log("Failed to delete from CONNECTIONS_TABLE:", err);
-        throw e;
+        throw err;
       }
     }
   });
 
   try {
     await Promise.all(postCalls);
-  } catch (e) {
-    return { statusCode: 500, body: e.stack };
+  } catch (err) {
+    return { statusCode: 500, body: err.stack };
   }
 
   return { statusCode: 200, body: "Data sent." };

@@ -1,15 +1,16 @@
 # rgempad-backend
 
 This is the code and template for the `rgempad-backend`.
-There are three functions contained within the directories and a `SAM` template that wires them up to a `DynamoDB` table and provides the minimal set of permissions needed to run the app:
+There are one `HTTP` function, three `WEBSOCKET` functions, and single scheduled event function contained within the directories and a `SAM` template that wires them up to a `DynamoDB` table and provides the minimal set of permissions needed to run the app:
 
 ```
 .
 ├── README.md                   <-- This instructions file
-├── ondisconnect                <-- Source code ondisconnect
-├── onhello                     <-- Source code onhello
-├── ontoggle                    <-- Source code ontoggle
-├── schedhb                     <-- Source code schedhb
+├── gempost (htte route)
+├── ondisconnect (websocket route)
+├── onhello (websocket route)
+├── ontoggle (websocket route)
+├── schedhb (scheduled event)
 └── template.yaml               <-- SAM template for Lambda Functions and DDB
 ```
 
@@ -30,6 +31,8 @@ aws cloudformation describe-stacks \
 
 ## Testing the rgempad API
 
+The rgempad API has two seperate ``ApiGateways``, one for `HTTP` connections (E.g. `RGempadHttpApi`) and another for `WEBSOCKET` connections (E.g. `RGempadBackendApi`)
+
 To test the WebSocket API, you can use [wscat](https://github.com/websockets/wscat), an open-source command line tool.
 
 1. [Install NPM](https://www.npmjs.com/get-npm).
@@ -39,16 +42,16 @@ To test the WebSocket API, you can use [wscat](https://github.com/websockets/wsc
 $ npm install -g wscat
 ```
 
-3. On the console, connect to your published API endpoint by executing the following command:
+3. On the console, connect to your published websocket API endpoint by executing the following command:
 
 ```bash
-$ wscat -c wss://{YOUR-API-ID}.execute-api.{YOUR-REGION}.amazonaws.com/{STAGE}
+$ wscat -c wss://{RGempadBackendApi-ID}.execute-api.{YOUR-REGION}.amazonaws.com/Prod
 ```
 
-4. To test the toggle function, send a JSON message like the following example. The Lambda function sends it back using the callback URL:
+4. To test the toggle websocket function, send a JSON message like the following example. The Lambda function sends it back using the callback URL:
 
 ```bash
-$ wscat -c wss://{YOUR-API-ID}.execute-api.{YOUR-REGION}.amazonaws.com/prod
+$ wscat -c wss://{RGempadBackendApi-ID}.execute-api.{YOUR-REGION}.amazonaws.com/Prod
 connected (press CTRL+C to quit)
 > { "type": "hello", "gemId": "default"}
 < { "type":"update", "gemState": ... }
@@ -56,6 +59,18 @@ connected (press CTRL+C to quit)
 < { "type":"update", "gemState": ... }
 ```
 
-## License Summary
+To test the gempost HTTP function, while connected and subscribed to `<gemID>` via `wscat` as show above, in a seperate terminal POST a JSON message like the following example 
 
-This sample code is made available under a modified MIT license. See the LICENSE file.
+```bash
+$ curl -X POST \ 
+  https://{RGempadHttpApi-ID}.execute-api.{YOUR-REGION}.amazonaws.com/Prod/gem/<gemId> \
+  -H "Content-Type: application/json" \
+  -d "<gemState>"
+< {"gemId":"<gemId>", "echo":<gemState>}
+```
+
+All websocket connected and subscribed to `<gemId>` should receive the following 
+
+```
+< { "type":"update", "gemState":<gemState> }
+```

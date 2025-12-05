@@ -31,7 +31,98 @@ Resources:
         Name: gemId
         Type: String
 
-#######
+###############################################################
+  RGempadHttpApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: RGempadHttpApi
+      ProtocolType: HTTP
+      # The route selection expression determines how the API Gateway selects the route to invoke based on the request.
+      # In this case, we use the request path to determine the route.
+      RouteSelectionExpression: "$request.method $request.path"
+
+  #######
+  RGempadHttpApiDeployment:
+    Type: AWS::ApiGatewayV2::Deployment
+    DependsOn:
+      - GemPostRoute
+    Properties:
+      ApiId: !Ref RGempadHttpApi
+
+  #######
+  RGempadHttpApiStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      StageName: Prod
+      Description:  RGempadHttpApi Prod Stage
+      DeploymentId: !Ref RGempadHttpApiDeployment
+      ApiId: !Ref RGempadHttpApi
+
+  #######
+  GemPostRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref RGempadHttpApi
+      RouteKey: "POST /gem/{gemId}"
+      AuthorizationType: NONE
+      OperationName: GemPostRoute
+      Target: !Join
+        - "/"
+        - - "integrations"
+          - !Ref GemPostInteg
+
+  #######
+  GemPostInteg:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref RGempadHttpApi
+      Description: Gem Post Integration
+      IntegrationType: AWS_PROXY
+      IntegrationMethod: POST
+      # Informs lambda payload and response object formats
+      # seee: https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-develop-integrations-lambda.html
+      PayloadFormatVersion: "2.0"
+      IntegrationUri:
+        Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GemPostFunction.Arn}/invocations
+
+  #######
+  GemPostFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: gempost/
+      Handler: app.handler
+      MemorySize: 256
+      Runtime: nodejs20.x
+      Environment:
+        Variables:
+          # Note: that cannot construct this envar for other functions because of circular dependencies
+          # The API endpoint is constructed to ensure it works with a custom domain
+          API_ENDPOINT: !Sub "https://${RGempadBackendApi}.execute-api.${AWS::Region}.amazonaws.com/${Stage}"
+          CONNECTIONS_TABLE: !Ref ConnectionsTable
+          GEM_STATE_TABLE: !Ref GemStateTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref GemStateTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ConnectionsTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - "execute-api:ManageConnections"
+              Resource:
+                - !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${RGempadBackendApi}/*"
+
+  #######
+  GemPostPermission:
+    Type: AWS::Lambda::Permission
+    DependsOn:
+      - RGempadHttpApi
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref GemPostFunction
+      Principal: apigateway.amazonaws.com
+
+###############################################################
   RGempadBackendApi:
     Type: AWS::ApiGatewayV2::Api
     Properties:
@@ -93,6 +184,7 @@ Resources:
     Type: AWS::ApiGatewayV2::Route
     Properties:
       ApiId: !Ref RGempadBackendApi
+      # Note: that the route key is $disconnect which is a special route invoked when a client disconnects
       RouteKey: $disconnect
       AuthorizationType: NONE
       OperationName: DisconnectRoute
@@ -217,6 +309,30 @@ Resources:
       Principal: apigateway.amazonaws.com
 
 ##############
+  OnDisconnectFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ondisconnect/
+      Handler: app.handler
+      MemorySize: 256
+      Runtime: nodejs20.x
+      Environment:
+        Variables:
+          CONNECTIONS_TABLE: !Ref ConnectionsTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ConnectionsTable
+
+  OnDisconnectPermission:
+    Type: AWS::Lambda::Permission
+    DependsOn:
+      - RGempadBackendApi
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref OnDisconnectFunction
+      Principal: apigateway.amazonaws.com
+
+##############
   SchedHeartbeatFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -249,30 +365,7 @@ Resources:
       FunctionName: !Ref  SchedHeartbeatFunction
       Principal: apigateway.amazonaws.com
 
-##############
-  OnDisconnectFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: ondisconnect/
-      Handler: app.handler
-      MemorySize: 256
-      Runtime: nodejs20.x
-      Environment:
-        Variables:
-          CONNECTIONS_TABLE: !Ref ConnectionsTable
-      Policies:
-        - DynamoDBCrudPolicy:
-            TableName: !Ref ConnectionsTable
-
-  OnDisconnectPermission:
-    Type: AWS::Lambda::Permission
-    DependsOn:
-      - RGempadBackendApi
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref OnDisconnectFunction
-      Principal: apigateway.amazonaws.com
-
+###############################################################
 Outputs:
   ConnectionsTableArn:
     Description: "Connections table ARN"
@@ -310,5 +403,20 @@ Outputs:
           !Ref "AWS::Region",
           ".amazonaws.com/",
           !Ref "Stage",
+        ],
+      ]
+
+  HttpApiEndpoint:
+    Description: "The HTTPS Protocol URI to connect to"
+    Value:
+      !Join [
+        "",
+        [
+          "https://",
+          !Ref RGempadHttpApi,
+          ".execute-api.",
+          !Ref "AWS::Region",
+          ".amazonaws.com/",
+          !Ref "RGempadHttpApiStage",
         ],
       ]

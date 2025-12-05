@@ -1,0 +1,9 @@
+{
+  "name": "gempost",
+  "version": "1.0.0",
+  "description": "gempost lambda function handler for rgempad HTTP backend",
+  "main": "src/app.js",
+  "author": "SAM CLI",
+  "license": "MIT",
+  "type": "module"
+}

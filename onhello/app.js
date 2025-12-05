@@ -23,6 +23,14 @@ export const handler = async (event) => {
   const connectionId = event.requestContext.connectionId;
   const gemId = JSON.parse(event.body).gemId;
 
+  // Validate gemId
+  if (!gemId) {
+    return {
+      statusCode: 400,
+      body: "Invalid request: gemId is required.",
+    };
+  }
+
   // 1. Associate the connectionId with the gemId in the CONNECTIONS_TABLE
   try {
     await ddbDocClient.send(
