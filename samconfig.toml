@@ -1,0 +1,34 @@
+version = 0.1
+
+[dev.deploy.parameters]
+stack_name = "rgem-dev"
+resolve_s3 = true
+s3_prefix = "rgem-dev"
+region = "us-east-1"
+confirm_changeset = true
+capabilities = "CAPABILITY_IAM"
+disable_rollback = true
+parameter_overrides = "EnvName=\"dev\" DomainBase=\"rgem.io\" HostedZoneId=\"REDACTED_HOSTED_ZONE_ID\" CertificateArn=\"arn:aws:acm:us-east-1:REDACTED_AWS_ACCOUNT_ID:certificate/REDACTED_CERTIFICATE_ID\""
+image_repositories = []
+
+[stage.deploy.parameters]
+stack_name = "rgem-stage"
+resolve_s3 = true
+s3_prefix = "rgem-stage"
+region = "us-east-1"
+confirm_changeset = true
+capabilities = "CAPABILITY_IAM"
+disable_rollback = true
+parameter_overrides = "EnvName=\"stage\" DomainBase=\"rgem.io\" HostedZoneId=\"REDACTED_HOSTED_ZONE_ID\" CertificateArn=\"arn:aws:acm:us-east-1:REDACTED_AWS_ACCOUNT_ID:certificate/REDACTED_CERTIFICATE_ID\""
+image_repositories = []
+
+[prod.deploy.parameters]
+stack_name = "rgem-prod"
+resolve_s3 = true
+s3_prefix = "rgem-prod"
+region = "us-east-1"
+confirm_changeset = true
+capabilities = "CAPABILITY_IAM"
+disable_rollback = true
+parameter_overrides = "EnvName=\"prod\" DomainBase=\"rgem.io\" HostedZoneId=\"REDACTED_HOSTED_ZONE_ID\" CertificateArn=\"arn:aws:acm:us-east-1:REDACTED_AWS_ACCOUNT_ID:certificate/REDACTED_CERTIFICATE_ID\""
+image_repositories = []
