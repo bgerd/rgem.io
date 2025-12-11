@@ -13,14 +13,14 @@ case "${ENV_NAME}" in
     ;;
 esac
 
-API_HOST="api-${ENV_NAME}.example.com"
-WS_HOST="ws-${ENV_NAME}.example.com"
+API_HOST="api-${ENV_NAME}.rgem.io"
+WS_HOST="ws-${ENV_NAME}.rgem.io"
 
 # Build SPA
 pushd frontend
+npm install
 VITE_API_BASE_URL="https://${API_HOST}" \
 VITE_WS_URL="wss://${WS_HOST}" \
-npm install
 npm run build
 popd
 
