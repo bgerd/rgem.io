@@ -1,11 +1,12 @@
 # rgem-backend
 
 This is the code and template for the `rgem-backend`.
-There are one `HTTP` function, three `WEBSOCKET` functions, and single scheduled event function contained within the directories and a `SAM` template that wires them up to a `DynamoDB` table and provides the minimal set of permissions needed to run the app:
+The project is comprised of one React frontend,  one `HTTP` function, three `WEBSOCKET` functions, and a single scheduled event function contained within sub directories, and a `SAM` template that wires them up to a `DynamoDB` table and provides the minimal set of permissions needed to run the app:
 
 ```
 .
 ├── README.md                   <-- This instructions file
+├── frontend (react-ts)
 ├── gempost (http route)
 ├── ondisconnect (websocket route)
 ├── onhello (websocket route)
@@ -24,13 +25,21 @@ Three environments `dev`, `stage`, `prod` with their own CloudFormation stacks (
 
 To deploy:
 
-#### 1. Build SAM artifacts locally and upload them to S3
+#### 1. Lint
 
 ```bash
+# Lint CloudFormation template
+sam validate --lint
+```
+
+#### 2. Build SAM artifacts locally and upload them to S3
+
+```bash
+# Must be re-run whenever handlers or template.yaml updated
 sam build & sam package 
 ```
 
-#### 2. Deploy CloudFormation stack from uploaded S3 artifacts
+#### 3. Deploy CloudFormation stack from uploaded S3 artifacts
 
 ```bash
 # Deploys rgem-dev
@@ -49,7 +58,29 @@ sam deploy --config-env stage
 sam deploy --config-env prod
 ```
 
+#### 4. Build, Package, and Deploy React Frontend 
+
+```bash
+# Deploys frontend to app-dev.rgen.io
+./infra/scripts/deploy-frontend.sh dev
+
+# Deploys frontend to app-stage.rgen.io
+./infra/scripts/deploy-frontend.sh stage
+
+# Deploys frontend to app-stage.rgen.io
+./infra/scripts/deploy-frontend.sh prod
+```
+
+
 # Testing
+
+## Frontend
+Navigate your browser to
+- Dev: [app-dev.rgem.io](app-dev.rgem.io)
+- Stage: [app-stage.rgem.io](app-stage.rgem.io)
+- Prod: [app.rgem.io](app.rgem.io)
+
+## Backend
 
 The rgempad API has two seperate ``ApiGateways``, one for `HTTP` connections (E.g. `RGempadHttpApi`) and another for `WEBSOCKET` connections (E.g. `RGempadWSApi`) per Environment / CloudFormation Stack.
 
@@ -78,7 +109,7 @@ $ wscat -c wss://<RGempadWSApi-ID>.execute-api.<YOUR-REGION>.amazonaws.com/Prod
 #### 4. To **toggle** websocket function send the following JSON messages over a connected websocket subscribed to `<gemId>`
 
 ```
-> { "type": "toggle", "buttonIndex": 0 }
+> { "type": "toggle", "idx": 0 }
 ```
 
 All connected websockets subscribed to `<gemId>` should immediately receive the following:

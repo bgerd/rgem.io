@@ -24,6 +24,9 @@ export const handler = async (event) => {
   // Note that we expect a JSON body with: { "type": "toggle", "idx": 0-15 }
   // AND that the client has already sent a "hello" message to associate its connectionId with a gemId.
   const connectionId = event.requestContext.connectionId;
+
+  // TODO: Reimplement in TypeScript with proper types, and properly validate and sanitize all inputs.
+  // Currently we are not handling when idx is undefined resulting in toggling all bits (BUG)
   const idx = JSON.parse(event.body).idx;
 
   // 1. Look up the gemId associated with this connectionId in the CONNECTIONS_TABLE

@@ -16,7 +16,6 @@ Parameters:
       - dev
       - stage
       - prod
-
   DomainBase:
     Type: String
     Default: rgem.io
@@ -388,9 +387,104 @@ Resources:
       Principal: apigateway.amazonaws.com
 
 ###############################################################
-# Setup custom domain names for the HTTP and WebSocket APIs
+# Setup CloudFront distribution for static website hosting of frontend React SPA
+  FrontendBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${AWS::StackName}-frontend-bucket"
+      # Enforce bucket to block all public access
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+  
+  # Grant CloudFront access to read from the S3 bucket
+  FrontendBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref FrontendBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowCloudFrontReadAccess
+            Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action:
+              - s3:GetObject
+            Resource: !Sub "${FrontendBucket.Arn}/*"
+            Condition:
+              StringEquals:
+                # Only this distribution can use the OAC to access the bucket
+                AWS:SourceArn: !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${FrontendDistribution}"
 
-  # Note: We are using a single pre-existing ACM certificate in us-east-1 for both domain names
+  # Requires CloudFront to sign and identify its requests to the S3 bucket
+  FrontendBucketOAC:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub "${AWS::StackName}-frontend-oac"
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+        Description: !Sub "OAC for app-${EnvName}.${DomainBase}"
+
+  FrontendDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: !Sub "Frontend for app-${EnvName}.${DomainBase}"
+        # Note: Authorizes the distribution to accept requests for these domain names
+        Aliases: 
+          - !If
+            - IsProd
+            - !Sub "app.${DomainBase}"
+            - !Sub "app-${EnvName}.${DomainBase}"
+        DefaultRootObject: "index.html"
+        Origins:
+          - Id: !Sub "frontend-origin-${EnvName}"
+            # Note: An S3 bucket’s RegionalDomainName is the AWS-provided DNS hostname
+            #       for that bucket’s REST endpoint in its specific region. It combines
+            #       your bucket name with an AWS-controlled regional suffix
+            #       (e.g. <bucketname>.s3.<region>.amazonaws.com) and is the recommended value to
+            #       use as a CloudFront origin.
+            DomainName: !GetAtt FrontendBucket.RegionalDomainName
+            S3OriginConfig: {}  # Required but empty when using OAC
+            OriginAccessControlId: !Ref FrontendBucketOAC
+
+        # CDN Cache behavior settings
+        DefaultCacheBehavior:
+          TargetOriginId: !Sub "frontend-origin-${EnvName}"
+          # Note: Redirect all HTTP requests to HTTPS
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: [GET, HEAD, OPTIONS]
+          CachedMethods: [GET, HEAD]
+          Compress: true
+          # You can later attach CachePolicy/OriginRequestPolicy here
+          ForwardedValues:
+            QueryString: false
+            Cookies:
+              Forward: none
+        ViewerCertificate:
+          AcmCertificateArn: !Ref CertificateArn
+          SslSupportMethod: sni-only
+          MinimumProtocolVersion: TLSv1.2_2021
+        CustomErrorResponses:
+          # SPA routing: map 404, 403 to /index.html
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: "/index.html"
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: "/index.html"
+
+###############################################################
+# Setup custom domain names for the HTTP and WebSocket APIs
+# Note: We are using a single pre-existing ACM certificate in us-east-1 for both domain names
+
+  # Domain Names
   HttpApiDomainName:
     Type: AWS::ApiGatewayV2::DomainName
     Properties:
@@ -415,6 +509,7 @@ Resources:
           EndpointType: REGIONAL
           SecurityPolicy: TLS_1_2
 
+  # Api Mappings
   HttpApiMapping:
     Type: AWS::ApiGatewayV2::ApiMapping
     Properties:
@@ -429,6 +524,7 @@ Resources:
       DomainName: !Ref WebSocketApiDomainName
       Stage: !Ref RGempadWSApiStage
 
+  # Route53 Alias Records
   HttpApiAliasRecord:
     Type: AWS::Route53::RecordSet
     Properties:
@@ -485,6 +581,41 @@ Resources:
         HostedZoneId: !GetAtt WebSocketApiDomainName.RegionalHostedZoneId
         EvaluateTargetHealth: false
 
+  FrontendAliasRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !If
+        - IsProd
+        - !Sub "app.${DomainBase}."
+        - !Sub "app-${EnvName}.${DomainBase}."
+      Type: A
+      AliasTarget:
+        # Note: A CloudFront distribution’s DomainName is its AWS-assigned public
+        #       DNS name (*.cloudfront.net), and all such names live in the same
+        #       AWS-owned Route 53 hosted zone (Z2FDTNDATAQYW2).
+        # see: https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-properties-route53-recordset-aliastarget.html
+        DNSName: !GetAtt FrontendDistribution.DomainName
+        HostedZoneId: Z2FDTNDATAQYW2
+        EvaluateTargetHealth: false
+
+  FrontendAliasRecordIPv6:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !If
+        - IsProd
+        - !Sub "app.${DomainBase}."
+        - !Sub "app-${EnvName}.${DomainBase}."
+      Type: AAAA
+      AliasTarget:
+        # Note: A CloudFront distribution’s DomainName is its AWS-assigned public
+        #       DNS name (*.cloudfront.net), and all such names live in the same
+        #       AWS-owned Route 53 hosted zone (Z2FDTNDATAQYW2).
+        # see: https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-properties-route53-recordset-aliastarget.html
+        DNSName: !GetAtt FrontendDistribution.DomainName
+        HostedZoneId: Z2FDTNDATAQYW2
+        EvaluateTargetHealth: false
 
 ###############################################################
 Outputs:
@@ -541,3 +672,14 @@ Outputs:
           !Ref "RGempadHttpApiStage",
         ],
       ]
+
+  FrontendBucketName:
+    Description: "Name of the S3 bucket storing frontend assets."
+    Value: !Ref FrontendBucket
+
+  FrontendDomainName:
+    Description: "Public URL for this environment's frontend SPA."
+    Value: !Sub "https://app-${EnvName}.${DomainBase}" 
+
+  FrontendDistributionId:
+    Value: !Ref FrontendDistribution
