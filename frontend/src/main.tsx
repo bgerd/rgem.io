@@ -1,13 +1,14 @@
-// frontend/src/main.tsx
+// src/main.tsx
 import React from "react";
 import ReactDOM from "react-dom/client";
-import App from "./App";
+import { App } from "./App";
+import { WebSocketProvider } from "./lib/WebSocketProvider";
+import "./styles/globals.css";
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
-  // Note: React.StrictMode causes double rendering of components in dev mode
-  //       which can affect components with side effects (e.g., WebSocket connections).
-  // see: https://react.dev/reference/react/StrictMode
   <React.StrictMode>
-    <App />
+    <WebSocketProvider>
+      <App />
+    </WebSocketProvider>
   </React.StrictMode>
 );
