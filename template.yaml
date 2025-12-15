@@ -66,7 +66,12 @@ Resources:
 
   #######
   RGempadHttpApiDeployment:
+    # NOTE: Remember that Deployments are immutable, so ANY change to routes or
+    # integrations requires a new deployment! Worst case to force a new deployment
+    # delete the stack and re-create it  
     Type: AWS::ApiGatewayV2::Deployment
+    # NOTE: `DependsOn` concerns order of resource creation, ensure all routes and
+    # integrations are created before deployment. It does NOT compel re-deployment
     DependsOn:
       - GemPostRoute
     Properties:
@@ -153,15 +158,27 @@ Resources:
       # The route selection expression determines how the API Gateway selects the route to invoke based on the request.
       # In this case, we use the request body to determine the route.
       # The expression "$request.body.type" means that the API Gateway will look for a "type" field in the JSON body of the request to determine which route to invoke.
+      # TODO: Revisit JSON structure to minimize payload size (e.g. replace "type" with "t"). 
+      # TODO: Define TypeScript interface shared between client and server for message format. Reimplement lambda functions in TypeScript.
       RouteSelectionExpression: "$request.body.type"
 
 #######
   RGempadWSApiDeployment:
+    # NOTE: Remember that Deployments are immutable, so ANY change to routes or
+    # integrations requires a new deployment! Worst case to force a new deployment
+    # delete the stack and re-create it
     Type: AWS::ApiGatewayV2::Deployment
+    # NOTE: `DependsOn` concerns order of resource creation, ensure all routes and
+    # integrations are created before deployment. It does NOT compel re-deployment
     DependsOn:
       - HelloRoute
+      - HelloInteg
+      - PingRoute
+      - PingInteg
       - ToggleRoute
+      - ToggleInteg
       - DisconnectRoute
+      - DisconnectInteg
     Properties:
       ApiId: !Ref RGempadWSApi
 
@@ -198,6 +215,27 @@ Resources:
       IntegrationType: AWS_PROXY
       IntegrationUri:
         Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${OnHelloFunction.Arn}/invocations
+
+#######
+  PingRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref RGempadWSApi
+      RouteKey: ping
+      AuthorizationType: NONE
+      OperationName: PingRoute
+      Target: !Join
+        - "/"
+        - - "integrations"
+          - !Ref PingInteg
+  PingInteg:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref RGempadWSApi
+      Description: Ping Integration
+      IntegrationType: AWS_PROXY
+      IntegrationUri:
+        Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${OnPingFunction.Arn}/invocations
 
 #######
   ToggleRoute:
@@ -273,6 +311,36 @@ Resources:
     Properties:
       Action: lambda:InvokeFunction
       FunctionName: !Ref OnHelloFunction
+      Principal: apigateway.amazonaws.com
+
+##############
+  OnPingFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: onping/
+      Handler: app.handler
+      MemorySize: 256
+      Runtime: nodejs20.x
+      Environment:
+        Variables:
+          CONNECTIONS_TABLE: !Ref ConnectionsTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ConnectionsTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - "execute-api:ManageConnections"
+              Resource:
+                - !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${RGempadWSApi}/*"
+
+  OnPingPermission:
+    Type: AWS::Lambda::Permission
+    DependsOn:
+      - RGempadWSApi
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref OnPingFunction
       Principal: apigateway.amazonaws.com
 
 ##############
@@ -355,6 +423,9 @@ Resources:
       SourceArn: !GetAtt HeartbeatScheduleRule.Arn
 
 ##############
+# TODO: Deprecate Scheduled Heartbeat in favor of client-side ping/pong and addition of 
+#       DynamoDB TTL attribute to sweep stale connections. Only neccesary to keep alive
+#       wscat connections during testing.
   SchedHeartbeatFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -630,6 +701,10 @@ Outputs:
   OnHelloFunctionArn:
     Description: "OnHello function ARN"
     Value: !GetAtt OnHelloFunction.Arn
+
+  OnPingFunctionArn:
+    Description: "OnPing function ARN"
+    Value: !GetAtt OnPingFunction.Arn
 
   OnToggleFunctionArn:
     Description: "OnToggle function ARN"

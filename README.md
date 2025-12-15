@@ -1,7 +1,7 @@
 # rgem-backend
 
 This is the code and template for the `rgem-backend`.
-The project is comprised of one React frontend,  one `HTTP` function, three `WEBSOCKET` functions, and a single scheduled event function contained within sub directories, and a `SAM` template that wires them up to a `DynamoDB` table and provides the minimal set of permissions needed to run the app:
+The project is comprised of one React frontend,  one `HTTP` function, four `WEBSOCKET` functions, and a single scheduled event function contained within sub directories, and a `SAM` template that wires them up to a `DynamoDB` table and provides the minimal set of permissions needed to run the app:
 
 ```
 .
@@ -10,6 +10,7 @@ The project is comprised of one React frontend,  one `HTTP` function, three `WEB
 ├── gempost (http route)
 ├── ondisconnect (websocket route)
 ├── onhello (websocket route)
+├── onping (websocket route)
 ├── ontoggle (websocket route)
 ├── schedhb (scheduled event)
 └── template.yaml               <-- SAM template for Lambda Functions and DDB
@@ -99,14 +100,26 @@ $ npm install -g wscat
 $ wscat -c wss://<RGempadWSApi-ID>.execute-api.<YOUR-REGION>.amazonaws.com/Prod
 ```
 
-#### 4. To test the **hello** function, send the following JSON messages over a connected websocket. The connection will then be subscribed to  `<gemId>` and it will immediately receive its current state.
+#### 4.a. To test the app-level **ping** function, send the following JSON messages over a connected websocket. 
+
+```
+> { "type": "ping" }
+< { "type": "pong"}
+```
+
+Note that an app-level ping is distinct from a protocol/control-level ping. 
+- The former is sent by the virtual RGEM pad instead of the latter, because there is no JavaScript API for sending control-level pings. 
+- RGEM pad devices only send control-level pings, which are handled by the API Gateway
+
+#### 4.b. To test the **hello** function, send the following JSON messages over a connected websocket. 
+The connection will then be subscribed to  `<gemId>` and it will immediately receive its current state.
 
 ```
 > { "type": "hello", "gemId": "<gemId>" }
 < { "type":"update", "gemState": ... }
 ```
 
-#### 4. To **toggle** websocket function send the following JSON messages over a connected websocket subscribed to `<gemId>`
+#### 4.c. To test **toggle** websocket function send the following JSON messages over a connected websocket subscribed to `<gemId>`
 
 ```
 > { "type": "toggle", "idx": 0 }
