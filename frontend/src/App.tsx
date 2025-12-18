@@ -11,7 +11,32 @@ import type {
 import { useWebSocket } from "./lib/WebSocketProvider";
 
 // Hard-coded RGEM IDs for now.
-const RGEM_IDS: string[] = ["default"];
+const RGEM_IDS: string[] = ["default", "test-1", "test-2"];
+
+// Map a cellId in [0, cellCount) to a CSS RGB string using the  
+// hardware device's wheelPos() "color wheel" function logic
+function keyColorCss(cellId: number, cellCount: number): RgbColor {
+  const wheelPos = cellId * 255 / cellCount; 
+
+  let r = 0, g = 0, b = 0;
+
+  if (wheelPos < 85) {
+    r = wheelPos * 3;
+    g = 255 - wheelPos * 3;
+    b = 0;
+  } else if (wheelPos < 170) {
+    const wp = wheelPos - 85;
+    r = 255 - wp * 3;
+    g = 0;
+    b = wp * 3;
+  } else {
+    const wp = wheelPos - 170;
+    r = 0;
+    g = wp * 3;
+    b = 255 - wp * 3;
+  }
+  return { r: Math.round(r), g: Math.round(g), b: Math.round(b) };
+}
 
 // Convert a 16-bit gemState bitmask into a GridState.
 function gemStateToGridState(gemState: number): GridState {
@@ -23,7 +48,7 @@ function gemStateToGridState(gemState: number): GridState {
     const isOn = (clamped & mask) !== 0;
 
     if (isOn) {
-      cells.push({ r: 255, g: 0, b: 0 }); // on => red
+      cells.push(keyColorCss(idx, 16)); // on
     } else {
       cells.push({ r: 0, g: 0, b: 0 }); // off => black (displayed as light gray)
     }
@@ -38,6 +63,9 @@ function createDefaultGrid(): GridState {
 }
 
 export const App: React.FC = () => {
+
+  /////////////
+  // Application state
   const [mode, setMode] = useState<AppMode>("configuration");
   const [connectionStatus, setConnectionStatus] =
     useState<ConnectionStatus>("idle");
@@ -46,14 +74,26 @@ export const App: React.FC = () => {
   const [gridState, setGridState] = useState<GridState>(() =>
     createDefaultGrid()
   );
+  const [isCellIdVisible, setIsCellIdVisible] = useState<boolean>(false);
 
-  const { sendJson, addMessageHandler, whenOpen } = useWebSocket();
+  /////////////
+  // Import WebSocketProvider state and hooks via useContext
+  // Assumes App is wrapped in WebSocketProvider higher in the tree
+  const {
+    readyState,
+    openSocket,
+    addMessageHandler,
+    sendJson,
+    closeSocket,
+  } = useWebSocket();
+
+  /////////////
+  // Application refs
 
   // Track the unsubscribe function for the current Update handler.
   const unsubscribeUpdateHandlerRef = useRef<(() => void) | null>(null);
-
-  // On unmount, remove any registered update handler.
   useEffect(() => {
+    // On unmount, remove any registered update handler.
     return () => {
       if (unsubscribeUpdateHandlerRef.current) {
         unsubscribeUpdateHandlerRef.current();
@@ -62,9 +102,30 @@ export const App: React.FC = () => {
     };
   }, []);
 
+  // Ref-to-latest pattern: keep latest state in a ref to avoid stale closures in long-lived callbacks.
+  const selectedRgemIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    selectedRgemIdRef.current = selectedRgemId;
+  }, [selectedRgemId]);
+
+  /////////////
+  // Application functions
+  const ensureConnected = async (why: string) : Promise<void> => {
+    console.log(`[RGEM] ensureConnected called (${why})`);
+
+    // Note: We opt to use a ref to avoid stale closures and
+    // reregistering ensureConnected as a callback on every selectedRgemId change.
+    const currentRgemId = selectedRgemIdRef.current;
+    if (currentRgemId === null) {
+      await openSocket(why);
+    } else {
+      await connectToRgem(currentRgemId);
+    }
+  }
+
   const connectToRgem = async (rgemId: string) => {
     // 1) Ensure the socket is open
-    await whenOpen();
+    await openSocket("rgem_specified");
 
     // 2) Remove any prior update stream handler
     if (unsubscribeUpdateHandlerRef.current) {
@@ -107,6 +168,9 @@ export const App: React.FC = () => {
       const originalResolve = resolve;
       const originalReject = reject;
 
+      // Because closures capture variables by reference in JavaScript’s lexical scope,
+      // we can reassign the local resolve/reject to wrapped versions that clear the timeout;
+      // subsequent calls in this scope will invoke the wrappers.
       resolve = (value: GridState | PromiseLike<GridState>) => {
         clearTimeout(timer);
         originalResolve(value);
@@ -122,6 +186,8 @@ export const App: React.FC = () => {
       const initialGrid = await firstUpdatePromise;
       setGridState(initialGrid);
     } catch (err) {
+
+      // TODO: Revisit FIRST_UPDATE_TIMEOUT_MS strategy based on UX testing.
       console.warn("[RGEM] First update did not arrive:", err);
       // Strategy choice:
       // - Option A: throw to surface error to UI flow
@@ -132,7 +198,7 @@ export const App: React.FC = () => {
       // throw err;
     }
 
-    // 5) Register the ongoing update stream handler (same as your current one)
+    // 5) Register the ongoing inbound stream handler
     const unsubscribeUpdateHandler = addMessageHandler((msg) => {
       const typed = msg as { type?: string; gemState?: unknown };
       if (typed.type === "update" && typeof typed.gemState === "number") {
@@ -143,6 +209,8 @@ export const App: React.FC = () => {
     unsubscribeUpdateHandlerRef.current = unsubscribeUpdateHandler;
   }
 
+  // Handle a click on "Connect" in the RgemSelectorModal
+  // Attempts to connect to the selected RGEM ID
   const handleConnect = async () => {
     if (!selectedRgemId) return;
 
@@ -161,18 +229,10 @@ export const App: React.FC = () => {
     }
   };
 
-  /**
-   * Handle a click on a grid cell.
-   *
-   * - Logs the cellId and color to the console.
-   * - Sends: { type: "toggle", idx: cellId }.
-   */
-  const handleGridClick = (cellId: number, color: RgbColor) => {
-    console.log("Grid cell clicked:", {
-      cellId,
-      color,
-      rgemId: selectedRgemId,
-    });
+  // Handle a click on a grid cell in the RGemGridPage
+  // Sends: { type: "toggle", idx: cellId } via WebSocket
+  const handleGridClick = (cellId: number) => {
+    console.log("Grid cell clicked:", cellId);
 
     const msg = {
       type: "toggle",
@@ -183,12 +243,71 @@ export const App: React.FC = () => {
     sendJson(msg);
   };
 
-  const isConnecting = connectionStatus === "connecting";
+  /////////////
+  // Manage WebSocket lifecycle based on app visibility
+  useEffect(() => {
+    console.log("app mount");
+
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") {
+        closeSocket("hidden");
+      } else {
+        void ensureConnected("visible");
+      }
+    };
+    const onPageHide = () => closeSocket("pagehide");
+    const onPageShow = () => void ensureConnected("pageshow");
+    const onOnline = () => void ensureConnected("online");
+    const onOffline = () => closeSocket("offline");
+
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pagehide", onPageHide);
+    window.addEventListener("pageshow", onPageShow);
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
+
+    // Note: we rely on an initial pageshow to establish initial connection.
+
+    // Handle ? key to toggle cell ID visibility
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Use event.key for modern browser compatibility (2025 standard)
+      if (event.key === "?") {
+        setIsCellIdVisible((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      console.log("app unmount");
+
+      // On unmount, remove any registered update handler.
+      if (unsubscribeUpdateHandlerRef.current) {
+        unsubscribeUpdateHandlerRef.current();
+        unsubscribeUpdateHandlerRef.current = null;
+      }
+
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pagehide", onPageHide);
+      window.removeEventListener("pageshow", onPageShow);
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
+
+      closeSocket("unmount");
+
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
+
+  // Determines visibility of LoadingOverlay
+  const isConnecting = (connectionStatus === "connecting"
+    || readyState === "CONNECTING"
+    || readyState === "CLOSING"
+    || readyState === "CLOSED");
 
   return (
     <div className="rgem-app-root">
       {/* Underlying grid is always rendered. Mode simply affects overlay. */}
-      <RGemGridPage cells={gridState} onCellClick={handleGridClick} />
+      <RGemGridPage cells={gridState} onCellClick={handleGridClick} isLabelVisible={isCellIdVisible} />
 
       {/* Configuration mode: show selector modal over the grid */}
       {mode === "configuration" && (
