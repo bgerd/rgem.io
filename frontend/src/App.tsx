@@ -11,7 +11,7 @@ import type {
 import { useWebSocket } from "./lib/WebSocketProvider";
 
 // Hard-coded RGEM IDs for now.
-const RGEM_IDS: string[] = ["default", "test-1", "test-2"];
+const RGEM_IDS: string[] = ["test-1", "test-2", "default"];
 
 // Map a cellId in [0, cellCount) to a CSS RGB string using the  
 // hardware device's wheelPos() "color wheel" function logic
@@ -111,19 +111,25 @@ export const App: React.FC = () => {
   /////////////
   // Application functions
   const ensureConnected = async (why: string) : Promise<void> => {
-    console.log(`[RGEM] ensureConnected called (${why})`);
+    console.log(`[App ensureConnected] start(${why}) `);
 
     // Note: We opt to use a ref to avoid stale closures and
     // reregistering ensureConnected as a callback on every selectedRgemId change.
     const currentRgemId = selectedRgemIdRef.current;
     if (currentRgemId === null) {
+      console.log( "... No RGEM selected, opening socket only");
       await openSocket(why);
     } else {
-      await connectToRgem(currentRgemId);
+      console.log("... RGEM selected, connecting to RGEM");
+      await connectToRgem(why);
     }
+    console.log(`[App ensureConnected] done(${why})`);
+
   }
 
-  const connectToRgem = async (rgemId: string) => {
+  const connectToRgem = async (why: string) => {
+    console.log(`[App connectToRgem] start(${why})`);
+
     // 1) Ensure the socket is open
     await openSocket("rgem_specified");
 
@@ -134,9 +140,7 @@ export const App: React.FC = () => {
     }
 
     // 3) Send hello
-    const helloMsg = { type: "hello", gemId: rgemId };
-    console.log("[RGEM] Sending hello:", helloMsg);
-    sendJson(helloMsg);
+    sendJson({ type: "hello", gemId: selectedRgemIdRef.current });
 
     // 4) Await first 'update' with timeout and guaranteed cleanup
     const FIRST_UPDATE_TIMEOUT_MS = 10000;
@@ -186,9 +190,9 @@ export const App: React.FC = () => {
       const initialGrid = await firstUpdatePromise;
       setGridState(initialGrid);
     } catch (err) {
-
+      
       // TODO: Revisit FIRST_UPDATE_TIMEOUT_MS strategy based on UX testing.
-      console.warn("[RGEM] First update did not arrive:", err);
+      console.error("... First update did not arrive:", err);
       // Strategy choice:
       // - Option A: throw to surface error to UI flow
       // - Option B: degrade gracefully and keep default grid
@@ -207,52 +211,54 @@ export const App: React.FC = () => {
       }
     });
     unsubscribeUpdateHandlerRef.current = unsubscribeUpdateHandler;
+
+    console.log(`[App connectToRgem] done(${why})`);
+
   }
 
   // Handle a click on "Connect" in the RgemSelectorModal
   // Attempts to connect to the selected RGEM ID
   const handleConnect = async () => {
-    if (!selectedRgemId) return;
+    if (!selectedRgemIdRef.current) return;
 
     setConnectionError(null);
     setConnectionStatus("connecting");
 
-    try {
-      await connectToRgem(selectedRgemId);
+    await connectToRgem("handle_connect").then(() => {
       setConnectionStatus("connected");
       setMode("operation"); // configuration -> operation
-    } catch (err) {
+    }).catch((err) => {
+      
+      // TODO: Revisit appropriate error handling strategy
       console.error("Failed to connect to RGEM:", err);
       setConnectionStatus("error");
       setConnectionError("Unable to connect. Please try again.");
       setMode("configuration");
-    }
+      
+    });
   };
 
   // Handle a click on a grid cell in the RGemGridPage
   // Sends: { type: "toggle", idx: cellId } via WebSocket
   const handleGridClick = (cellId: number) => {
-    console.log("Grid cell clicked:", cellId);
-
-    const msg = {
+    console.log(`[App handleGridClick] ${cellId}`);
+    sendJson({
       type: "toggle",
       idx: cellId,
-    };
-
-    console.log("[RGEM] Sending toggle:", msg);
-    sendJson(msg);
+    });
   };
 
   /////////////
   // Manage WebSocket lifecycle based on app visibility
   useEffect(() => {
-    console.log("app mount");
+    console.log("-- app_mount --");
 
     const onVisibility = () => {
+      console.log("document.visibilityState:", document.visibilityState);
       if (document.visibilityState === "hidden") {
-        closeSocket("hidden");
+        closeSocket("visibility_state_hidden");
       } else {
-        void ensureConnected("visible");
+        void ensureConnected("visibility_state_visible");
       }
     };
     const onPageHide = () => closeSocket("pagehide");
@@ -260,13 +266,15 @@ export const App: React.FC = () => {
     const onOnline = () => void ensureConnected("online");
     const onOffline = () => closeSocket("offline");
 
-    document.addEventListener("visibilitychange", onVisibility);
-    window.addEventListener("pagehide", onPageHide);
-    window.addEventListener("pageshow", onPageShow);
-    window.addEventListener("online", onOnline);
-    window.addEventListener("offline", onOffline);
-
-    // Note: we rely on an initial pageshow to establish initial connection.
+    // We add the event listeners after ensuring connection to prevent
+    // race conditions during initial mount.
+    void ensureConnected("app_mount").then(() => {
+        document.addEventListener("visibilitychange", onVisibility);
+        window.addEventListener("pagehide", onPageHide);
+        window.addEventListener("pageshow", onPageShow);
+        window.addEventListener("online", onOnline);
+        window.addEventListener("offline", onOffline);
+    });
 
     // Handle ? key to toggle cell ID visibility
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -278,7 +286,9 @@ export const App: React.FC = () => {
     window.addEventListener("keydown", handleKeyDown);
 
     return () => {
-      console.log("app unmount");
+      console.log("-- app_unmount --");
+
+      closeSocket("app_unmount");
 
       // On unmount, remove any registered update handler.
       if (unsubscribeUpdateHandlerRef.current) {
@@ -291,8 +301,6 @@ export const App: React.FC = () => {
       window.removeEventListener("pageshow", onPageShow);
       window.removeEventListener("online", onOnline);
       window.removeEventListener("offline", onOffline);
-
-      closeSocket("unmount");
 
       window.removeEventListener("keydown", handleKeyDown);
     };
