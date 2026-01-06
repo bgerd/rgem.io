@@ -1,12 +1,20 @@
 # rgem-backend
 
 This is the code and template for the `rgem-backend`.
-The project is comprised of one React frontend,  one `HTTP` function, four `WEBSOCKET` functions, and a single scheduled event function contained within sub directories, and a `SAM` template that wires them up to a `DynamoDB` table and provides the minimal set of permissions needed to run the app:
+The project is comprised of:
+- one React frontend
+- deployment scripts
+- one `HTTP` function
+- four `WEBSOCKET` functions
+- a single scheduled event function
+- a `SAM` template that wires them up to a `DynamoDB` table and provides the minimal set of permissions needed to run the app
+
 
 ```
 .
 ├── README.md                   <-- This instructions file
 ├── frontend (react-ts)
+├── infra / scripts             <-- deployment scripts
 ├── gempost (http route)
 ├── ondisconnect (websocket route)
 ├── onhello (websocket route)
@@ -16,18 +24,17 @@ The project is comprised of one React frontend,  one `HTTP` function, four `WEBS
 └── template.yaml               <-- SAM template for Lambda Functions and DDB
 ```
 
-# Deploying to your account
+# Remote Deployment
 
-## AWS CLI commands
+## Prerequisites
 
-You can install the [AWS SAM CLI](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-install.html) and use it to package, deploy, and describe your application. 
+You can install the [AWS SAM CLI](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-install.html) and use it to package, deploy, and describe the application. 
 
-Three environments `dev`, `stage`, `prod` with their own CloudFormation stacks (E.g. `rgem-dev`, `rgem-stage` and `rgem-prod`) are pre-defined by `samconfig.toml`. 
+Three environments `dev`, `stage`, `prod` with their own CloudFormation stacks (E.g. `rgem-dev`, `rgem-stage` and `rgem-prod`) are defined by `samconfig.toml`. 
 
-To deploy:
+## Deployment Steps
 
 #### 1. Lint
-
 ```bash
 # Lint CloudFormation template
 sam validate --lint
@@ -80,6 +87,30 @@ Navigate your browser to
 - Dev: [app-dev.rgem.io](app-dev.rgem.io)
 - Stage: [app-stage.rgem.io](app-stage.rgem.io)
 - Prod: [app.rgem.io](app.rgem.io)
+
+## Frontend (Local)
+In a terminal window, navigate to `frontend` subdirectory and set `VITE_WS_URL` for the current session :
+
+```bash
+# Connects frontend to dev backend
+$ export VITE_WS_URL=wss://ws-dev.rgem.io
+
+# Connects frontend to stage backend
+$ export VITE_WS_URL=wss://ws-stage.rgem.io
+
+# Connects frontend to prod backend
+$ export VITE_WS_URL=wss://ws.rgem.io
+```
+
+Then start the React development server and open a browser to http://localhost:5173/
+
+```bash
+$ npm run dev
+```
+
+Remember that in **React Strict Mode** components intentionally render twice in **development mode** to help find accidental side-effects and ensure components are resilient to being mounted and unmounted.
+
+So that when running locally: we expect an initial WebSocket connection to fail, because it is closed before the connection is established 
 
 ## Backend
 

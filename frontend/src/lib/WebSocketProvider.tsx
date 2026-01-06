@@ -19,14 +19,19 @@ function getWebSocketUrl(): string {
   return url;
 }
 
+// Note: ReadyState is only set to CONNECTING by openSocket(),
+// only set to OPEN by the socket 'open' event handler,
+// and only set to CLOSED by closeSocket()
+// TODO: Eliminate CLOSING state
 type ReadyState = "CLOSED" | "CONNECTING" | "OPEN" | "CLOSING";
 
 // Defines Context's shared attributes and their types.
 type WebSocketContextValue = {
   readyState: ReadyState;
-  sendJson: (data: unknown) => void;
-  addMessageHandler: (handler: (msg: unknown) => void) => () => void;
   openSocket: (why: string) => Promise<void>;
+  // TODO: Reimplement callbacks to consider readyState before execution
+  addMessageHandler: (handler: (msg: unknown) => void) => () => void;
+  sendJson: (data: unknown) => void;
   closeSocket: (reason: string) => void;
 };
  
@@ -58,6 +63,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({
   // Track connection state internally via ref for sync access in callbacks.
   const socketRef = useRef<WebSocket | null>(null);
 
+  // Socket event handlers 
   const handleOpenRef = useRef<(() => void) | null>(null);
   const handleMessageRef = useRef<((event: MessageEvent) => void) | null>(null);
   const handleErrorRef = useRef<((event: Event) => void) | null>(null);
@@ -96,7 +102,8 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({
   // Define scheduleNextPing and openSocket callbacks together to avoid circular self-deps.
   const { scheduleNextPing, openSocket, closeSocket } = useMemo(() => {
 
-    // TODO: Test reconnect path
+    // Private function only called by scheduleNextPing; not exposed to consumers.
+    // TODO: Consider inlining this function into scheduleNextPing
     function scheduleReconnect() {
       console.log("[WSProvider scheduleReconnect]");
 
@@ -120,9 +127,13 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({
       }, delay);
     }
 
+    // Private function; not exposed to consumers. 
+    // Called by handleMessage (socket event handler) and sendJson to maintain liveness.
+    // TODO: Assert readyState is OPEN before sending ping and considering throwing error
     function scheduleNextPing() {
       console.log("[WSProvider scheduleNextPing]");
 
+      // Clear any existing ping timer since we're rescheduling based on new activity.
       if (pingTimerRef.current)
         window.clearTimeout(pingTimerRef.current);
 
@@ -133,6 +144,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({
       
         const socket = socketRef.current;
         if (!socket || socket.readyState !== WebSocket.OPEN){
+          // TODO: Revisit and test this error condition 
           console.log("... Ping aborted. Socket not open");
           return;
         }
@@ -159,6 +171,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({
       // Ref-to-latest pattern: Check readyStateRef instead of readyState to avoid dependent re-renders
       if (readyStateRef.current === "OPEN") {
         console.log("... WebSocket already open or connecting: ", readyStateRef.current);
+        // TODO: Assert socketRef.current is not null and its readyState is OPEN
         console.log(socketRef.current ? "... Socket exists" : "... Socket does not exist");
         console.log(`... Socket readyState: ${socketRef.current?.readyState}`);
         return Promise.resolve();
@@ -166,6 +179,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({
       // Ref-to-latest pattern: Check readyStateRef instead of readyState to avoid dependent re-renders
       if (readyStateRef.current === "CONNECTING") {
         console.log("... WebSocket already open or connecting: ", readyStateRef.current);
+        // TODO: Assert socketRef.current is not null and its readyState is CONNECTING
         console.log(socketRef.current ? "... Socket exists" : "... Socket does not exist");
         console.log(`... Socket readyState: ${socketRef.current?.readyState}`);
         
@@ -296,6 +310,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({
       return openPromise;
     }
 
+    // TODO: Consider expected readyState
     function closeSocket(why: string) {
       console.log(`[WSProvider closeSocket] start(${why})`);
       
@@ -313,6 +328,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({
 
       // Important: Remove event listeners before closing to avoid handling events
       // triggered by the close() call below.
+      // TODO: Move clean-up after check of socket and socket.ReadyState 
       socket?.removeEventListener("open", handleOpenRef.current!);
       socket?.removeEventListener("message", handleMessageRef.current!);
       socket?.removeEventListener("error", handleErrorRef.current!);
@@ -351,6 +367,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [clearTimers]);
 
   // Sends a JSON-serializable object via the WebSocket.
+  // TODO: Assert readyState is OPEN and consdering throwing error
   const sendJson = useCallback((data: unknown) => {
     console.log(`[WSProvider sendJson] ${JSON.stringify(data)}`);
     const socket = socketRef.current;
@@ -371,6 +388,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [scheduleNextPing]);
 
   // Registers a message handler to be called on incoming messages.
+  // TODO: Assert readyState is OPEN and considering throwing error
   const addMessageHandler = useCallback(
     (handler: (msg: unknown) => void) => {
       messageHandlersRef.current.add(handler);
