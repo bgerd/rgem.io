@@ -13,8 +13,17 @@ case "${ENV_NAME}" in
     ;;
 esac
 
-API_HOST="api-${ENV_NAME}.rgem.io"
-WS_HOST="ws-${ENV_NAME}.rgem.io"
+# Set API/WS hosts based on environment
+case "${ENV_NAME}" in
+  prod)
+    API_HOST="api.rgem.io"
+    WS_HOST="ws.rgem.io"
+    ;;
+  dev|stage)
+    API_HOST="api-${ENV_NAME}.rgem.io"
+    WS_HOST="ws-${ENV_NAME}.rgem.io"
+    ;;
+esac
 
 # Build SPA
 pushd frontend
