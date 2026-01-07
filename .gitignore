@@ -31,3 +31,4 @@ Temporary Items
 packaged.yaml
 node_modules/
 package-lock.json
+.env
