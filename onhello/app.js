@@ -86,18 +86,45 @@ export const handler = async (event) => {
     };
   }
 
+  // iterate through all bits of gemState and create a coresponding 24-bit array of length 16
+  // with RGB values for each bit (0 = black, 1 = magenta)
+  const gemStateArray = [];
+  for (let i = 0; i < 16; i++) {
+    const bit = (gemState >> i) & 1;
+    // TODO: Confirm RGB byte-order is correct for HW implementation
+    gemStateArray.push(bit === 1 ? [128, 0, 128] : [0, 0, 0]);
+  } 
+
+  // convert gemStateArray to a binary payload of length 16*3 = 48 bytes
+  const payload = new Uint8Array(48);
+  for (let i = 0; i < 16; i++) {
+    payload.set(gemStateArray[i], i * 3);
+  }
+
+  // console.log('gemStateArray', gemStateArray);
+  // console.log('payload', payload);
+  // console.log('payload instanceof Uint8Array', payload instanceof Uint8Array);
+  // console.log('Buffer.isBuffer(payload)', Buffer.isBuffer(payload));
+  // console.log('byteLength', Buffer.from(payload).byteLength);
+
   // 3. Post current gemState to connectionId
   const apiGateway = new ApiGatewayManagementApiClient({
     // The endpoint is intentionally constructed using the API ID and stage from the event to account for custom domains
     endpoint: `https://${event.requestContext.apiId}.execute-api.${AWS_REGION}.amazonaws.com/${event.requestContext.stage}`,
   });
-  try {
+try {
+    // NOTE: AWS API Gateway WebSocket APIs does not support binary messaging! it only can send/receive text frames!
+    // so we need to encode our binary payload as a base64 string and decode it on the client side.
+    // See: https://docs.aws.amazon.com/apigateway/latest/developerguide/websocket-api-develop-binary-media-types.html
+    // See: https://repost.aws/questions/QUtbrnTNl6RJeseAE6ZCzx9Q/api-gateway-websocket-binary-frames
     await apiGateway.send(
       new PostToConnectionCommand({
         ConnectionId: connectionId,
+        // TODO: Reimplement JSON-based messaging protocol as a more efficient binary protocol (encoded as base64 for API Gateway transport) to reduce message size and parsing overhead on the client.
+
         Data: JSON.stringify({
           type: "update",
-          gemState: gemState,
+          gemState: Buffer.from(payload).toString('base64'),
         }),
       })
     );

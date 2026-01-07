@@ -6,60 +6,32 @@ import type {
   AppMode,
   ConnectionStatus,
   GridState,
-  RgbColor,
 } from "./types/grid";
 import { useWebSocket } from "./lib/WebSocketProvider";
 
 // Hard-coded RGEM IDs for now.
 const RGEM_IDS: string[] = ["test-1", "test-2", "default"];
 
-// Map a cellId in [0, cellCount) to a CSS RGB string using the  
-// hardware device's wheelPos() "color wheel" function logic
-function keyColorCss(cellId: number, cellCount: number): RgbColor {
-  const wheelPos = cellId * 255 / cellCount; 
-
-  let r = 0, g = 0, b = 0;
-
-  if (wheelPos < 85) {
-    r = wheelPos * 3;
-    g = 255 - wheelPos * 3;
-    b = 0;
-  } else if (wheelPos < 170) {
-    const wp = wheelPos - 85;
-    r = 255 - wp * 3;
-    g = 0;
-    b = wp * 3;
-  } else {
-    const wp = wheelPos - 170;
-    r = 0;
-    g = wp * 3;
-    b = 255 - wp * 3;
-  }
-  return { r: Math.round(r), g: Math.round(g), b: Math.round(b) };
-}
-
-// Convert a 16-bit gemState bitmask into a GridState.
-function gemStateToGridState(gemState: number): GridState {
-  const clamped = gemState & 0xffff; // ensure 16 bits
+// Convert a 48-byte (16 x 24-bit RGB) gemState payload into a GridState.
+function gemStateToGridState(gemState: Uint8Array): GridState {
   const cells: GridState = [];
 
   for (let idx = 0; idx < 16; idx++) {
-    const mask = 1 << idx;
-    const isOn = (clamped & mask) !== 0;
+    // TODO: Confirm RGB byte-order is correct for HW implementation
 
-    if (isOn) {
-      cells.push(keyColorCss(idx, 16)); // on
-    } else {
-      cells.push({ r: 0, g: 0, b: 0 }); // off => black (displayed as light gray)
-    }
+    cells.push({
+      r: gemState[idx * 3],
+      g: gemState[idx * 3 + 1],
+      b: gemState[idx * 3 + 2]
+    }); 
   }
 
   return cells;
 }
 
-// Helper to create a default "all off" grid (gemState = 0).
+// Helper to create a default "all off" grid.
 function createDefaultGrid(): GridState {
-  return gemStateToGridState(0);
+  return gemStateToGridState(new Uint8Array(48));
 }
 
 export const App: React.FC = () => {
@@ -149,14 +121,26 @@ export const App: React.FC = () => {
 
       // Register a one-time message handler for the first update
       const unsubscribeFirstUpdateHandler = addMessageHandler((msg) => {
-        const typed = msg as { type?: string; gemState?: unknown };
 
+        // TODO: Reimplement JSON-based messaging protocol as a more efficient binary protocol (encoded as base64 for API Gateway transport) to reduce message size and parsing overhead on the client.
+        const typed = msg as { type?: string; gemState?: unknown };
+        
         // Guard: only handle the first valid update
-        if (typed.type === "update" && typeof typed.gemState === "number") {
-          const nextGrid = gemStateToGridState(typed.gemState);
+        if (typed.type === "update" && typeof typed.gemState === "string") {
+          // Convert gemState from base64 string back to Uint8Array
+          const decoded = atob(typed.gemState);
+          const payload = new Uint8Array(decoded.length);
+          for (let i = 0; i < decoded.length; i++) {
+            payload[i] = decoded.charCodeAt(i);
+          } 
+          const initialGrid = gemStateToGridState(payload);
+
           // Unsubscribe immediately since we only want the first update
           unsubscribeFirstUpdateHandler();
-          resolve(nextGrid);
+          
+          resolve(initialGrid);
+        } else {
+            reject(new Error(`Received non-update message or invalid initial gemState, ignoring: ${JSON.stringify(msg)}`));
         }
       });
 
@@ -204,10 +188,22 @@ export const App: React.FC = () => {
 
     // 5) Register the ongoing inbound stream handler
     const unsubscribeUpdateHandler = addMessageHandler((msg) => {
+
+      // TODO: Reimplement JSON-based messaging protocol as a more efficient binary protocol (encoded as base64 for API Gateway transport) to reduce message size and parsing overhead on the client.
       const typed = msg as { type?: string; gemState?: unknown };
-      if (typed.type === "update" && typeof typed.gemState === "number") {
-        const nextGrid = gemStateToGridState(typed.gemState);
+      if (typed.type === "update" && typeof typed.gemState === "string") {
+        // Convert gemState from base64 string back to Uint8Array
+        const decoded = atob(typed.gemState);
+        const payload = new Uint8Array(decoded.length);
+        for (let i = 0; i < decoded.length; i++) {
+          payload[i] = decoded.charCodeAt(i);
+        } 
+        const nextGrid = gemStateToGridState(payload);
         setGridState(nextGrid);
+      } else if (typed.type === "pong" || typed.type === "hb") {
+        // Ignore pong messages in the update handler; they are for connection health monitoring.
+      } else {
+          console.error("Received non-update message or invalid gemState, ignoring:", msg);
       }
     });
     unsubscribeUpdateHandlerRef.current = unsubscribeUpdateHandler;

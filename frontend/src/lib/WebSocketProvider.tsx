@@ -255,6 +255,18 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({
           pongTimerRef.current = null;
         }
 
+        // NOTE: AWS API Gateway only supports text frames!
+        // See: https://docs.aws.amazon.com/apigateway/latest/developerguide/websocket-api-develop-binary-media-types.html
+        // See: https://repost.aws/questions/QUtbrnTNl6RJeseAE6ZCzx9Q/api-gateway-websocket-binary-frames
+        // if (event.data instanceof ArrayBuffer) {
+        //   console.log("... Received binary message of byteLength", event.data.byteLength);
+        // } else if (typeof event.data === "string") {
+        //   console.log("... Received text message of length", event.data.length);
+        // } else {
+        //   console.log("... Received message of unknown type");
+        // }
+
+        // TODO: Reimplement JSON-based messaging protocol as a more efficient binary protocol (encoded as base64 for API Gateway transport) to reduce message size and parsing overhead on the client.
         let parsed: unknown = event.data;
         if (typeof event.data === "string") {
           try {
