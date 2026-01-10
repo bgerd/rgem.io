@@ -29,6 +29,10 @@ Mode next_state;
 #include <ArduinoJson.h>
 JsonDocument json_doc;
 
+// Use fast and lightweight base64 library for decoding gemState updates from the server
+// See: https://github.com/Densaugeo/base64_arduino
+#include <base64.hpp>
+
 ///////////////////////////////
 // Configure flash storage with samd-specific API
 // Td. Reimplement with generic EEPROM API 
@@ -151,7 +155,30 @@ void setup() {
       } else {
         
         ASSERT_PRLN((json_doc[F("type")] == "update"), F("ERROR: Invalid message from server"));
-        Keypad::update(json_doc[F("gemState")]);
+
+        // Convert base64 encoded gemState to uint8_t array and update
+        // 1. Point directly to the string in the JsonDocument (No copy)
+        const char* encoded = json_doc[F("gemState")]; 
+        if (!encoded) return;
+
+        // 2. Efficiently calculate required space
+        size_t inputLen = strlen(encoded);
+        size_t expectedLen = decode_base64_length((unsigned char*)encoded);
+
+        // 3. Use a stack-allocated buffer for speed and safety
+        // TODO: Try statically allocating decodeBuffer. Given fixed 48-byte payload we need 64 bytes of base64 encoding.
+        uint8_t decodedBuffer[expectedLen]; 
+
+        // 4. Perform the decode
+        int actualLen = decode_base64((unsigned char*)encoded, decodedBuffer);
+
+        // 5. Convert the decoded RGB byte array to uint32_t array expected by updateRGB
+        uint32_t rgb_state[16];
+        for (int i = 0; i < 16; i++) {
+          rgb_state[i] = (decodedBuffer[3*i] << 16) | (decodedBuffer[3*i + 1] << 8) | decodedBuffer[3*i + 2];
+        }
+
+        Keypad::updateRGB(rgb_state);
       }
     }
   });

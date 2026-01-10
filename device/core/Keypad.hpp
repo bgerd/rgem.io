@@ -6,7 +6,7 @@
 namespace Keypad {
   const int num_pixels = NEO_TRELLIS_NUM_KEYS;
   Adafruit_NeoTrellis trellis;
-  uint16_t state = 0;
+  uint32_t gem_state[16];
   unsigned long loop_timer = 0;
 
   // Returns a fixed Color for a given buttonIndex
@@ -25,33 +25,38 @@ namespace Keypad {
     }
     return 0;
   }
-
+  
   // Update the state of the pixels based on the given state
   void update(uint16_t state) {
-    //Td. Improve by only changing state of individual pixels when necessary
-    if (Keypad::state != state) {
-      Keypad::state = state;
-      for (int n = 0; n < 16; n++) {
-        if(((1 << n) & state) == (1 << n)) {
-          trellis.pixels.setPixelColor(n, keyColor(n));
-        } else {
-          trellis.pixels.setPixelColor(n, 0);
-        }
+    for (int n = 0; n < 16; n++) {
+      if(((1 << n) & state) == (1 << n)) {
+        uint32_t color = keyColor(n);
+        trellis.pixels.setPixelColor(n, color);
+        gem_state[n] = color;
+      } else {
+        trellis.pixels.setPixelColor(n, 0);
+        gem_state[n] = 0;     
       }
-      trellis.pixels.show();
     }
+    trellis.pixels.show();
+  }
+
+  // Update the state of the pixels based on the given RGB state
+  void updateRGB(uint32_t *rgb_state) {
+
+    for (int n = 0; n < 16; n++) {
+      trellis.pixels.setPixelColor(n, rgb_state[n]);
+      gem_state[n] = rgb_state[n];
+    }
+    trellis.pixels.show();
   }
 
   void turnOnAll() {
-    if (Keypad::state != 0xFFFF) {
-      update(0xFFFF);
-    }
+    update(0xFFFF);
   }
 
   void turnOffAll() {
-    if (Keypad::state != 0x0000) {
-      update(0x0000);
-    }
+    update(0x0000);
   }
 
   void showCascade() {
@@ -65,7 +70,6 @@ namespace Keypad {
       trellis.pixels.show();
       delay(50);
     }
-    Keypad::state = 0x0000;
   }
 
   //////////////////
