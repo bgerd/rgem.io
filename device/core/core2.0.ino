@@ -161,18 +161,14 @@ void setup() {
         const char* encoded = json_doc[F("gemState")]; 
         if (!encoded) return;
 
-        // 2. Efficiently calculate required space
-        size_t inputLen = strlen(encoded);
-        size_t expectedLen = decode_base64_length((unsigned char*)encoded);
+        // 2. Use a stack-allocated buffer for speed and safety
+        // Note: Given fixed 48-byte payload we need 64 bytes of base64 encoding.
+        uint8_t decodedBuffer[64]; 
 
-        // 3. Use a stack-allocated buffer for speed and safety
-        // TODO: Try statically allocating decodeBuffer. Given fixed 48-byte payload we need 64 bytes of base64 encoding.
-        uint8_t decodedBuffer[expectedLen]; 
-
-        // 4. Perform the decode
+        // 3. Perform the decode
         int actualLen = decode_base64((unsigned char*)encoded, decodedBuffer);
 
-        // 5. Convert the decoded RGB byte array to uint32_t array expected by updateRGB
+        // 4. Convert the decoded RGB byte array to uint32_t array expected by updateRGB
         uint32_t rgb_state[16];
         for (int i = 0; i < 16; i++) {
           rgb_state[i] = (decodedBuffer[3*i] << 16) | (decodedBuffer[3*i + 1] << 8) | decodedBuffer[3*i + 2];
