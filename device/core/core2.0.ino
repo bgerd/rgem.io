@@ -1,6 +1,6 @@
 // Td. Fix VS Code Include Paths 
 
-#define RGEMPAD_CORE_VERSION "core1.0"
+#define RGEMPAD_CORE_VERSION "core2.0"
 #define RGEMPAD_CORE_MODEL "rgempad"
 
 // #define RGEMPAD_DEBUG
