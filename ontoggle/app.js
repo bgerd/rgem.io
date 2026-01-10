@@ -16,6 +16,7 @@ const { CONNECTIONS_TABLE, GEM_STATE_TABLE, AWS_REGION } = process.env;
 const ddbClient = new DynamoDBClient({ region: AWS_REGION });
 const ddbDocClient = DynamoDBDocumentClient.from(ddbClient);
 
+// TODO: Create shared libraries for managing gemState, etc. 
 function keyColorCss(n, max) {
   const wheelPos = n * 255 / max; 
   let r = 0, g = 0, b = 0;
@@ -37,6 +38,14 @@ function keyColorCss(n, max) {
   }
   return [Math.round(r), Math.round(g), Math.round(b)];
 }
+
+// The gemState is represented as an array of 16 integers,
+// where each integer represents the state of a "gem"
+const GEM_STATE_LENGTH = 16;
+
+// The range of gemState values that map to the color wheel
+// (e.g. 8 means values 1-8 map to the color wheel, and 0 is off)
+const GEM_APP_TOGGLE_RANGE = 8; 
 
 // ES6 type module syntax
 export const handler = async (event) => {
@@ -99,8 +108,8 @@ export const handler = async (event) => {
     };
   }
   
-  // 2.2 Compute the new 16-value gemState: increment the value at idx and wrap around at 16
-  gemState[idx] = (gemState[idx] + 1) % 16; 
+  // 2.2 Compute the new gemState: increment the value at idx and wrap around at GEM_APP_TOGGLE_RANGE
+  gemState[idx] = (gemState[idx] + 1) % GEM_APP_TOGGLE_RANGE; 
 
   // 2.3 Update the gemState in the GEM_STATE_TABLE
   try {
@@ -121,20 +130,20 @@ export const handler = async (event) => {
     };
   }
 
-  // Iterate through 16-value gemState and create a coresponding 24-bit RGB array of length 16
+  // Iterate through gemState and create a coresponding 24-bit RGB array
   const gemStateRGBArray = [];
-  for (let i = 0; i < 16; i++) {
+  for (let i = 0; i < GEM_STATE_LENGTH; i++) {
     if (gemState[i] == 0) {
       // If the gemState is Off, push [0, 0, 0] to gemStateRGBArray
       gemStateRGBArray.push([0, 0, 0]);
       continue;
     }
-    gemStateRGBArray.push(keyColorCss(gemState[i]-1, 15));
+    gemStateRGBArray.push(keyColorCss(gemState[i]-1, GEM_APP_TOGGLE_RANGE));
   } 
 
   // Convert gemStateRGBArray to a binary payload of length 16*3 = 48 bytes
-  const payload = new Uint8Array(48);
-  for (let i = 0; i < 16; i++) {
+  const payload = new Uint8Array(GEM_STATE_LENGTH * 3);
+  for (let i = 0; i < GEM_STATE_LENGTH; i++) {
     payload.set(gemStateRGBArray[i], i * 3);
   }
 
