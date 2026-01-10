@@ -14,6 +14,28 @@ const { CONNECTIONS_TABLE, GEM_STATE_TABLE, AWS_REGION } = process.env;
 const ddbClient = new DynamoDBClient({ region: AWS_REGION });
 const ddbDocClient = DynamoDBDocumentClient.from(ddbClient);
 
+function keyColorCss(n, max) {
+  const wheelPos = n * 255 / max; 
+  let r = 0, g = 0, b = 0;
+
+  if (wheelPos < 85) {
+    r = wheelPos * 3;
+    g = 255 - wheelPos * 3;
+    b = 0;
+  } else if (wheelPos < 170) {
+    const wp = wheelPos - 85;
+    r = 255 - wp * 3;
+    g = 0;
+    b = wp * 3;
+  } else {
+    const wp = wheelPos - 170;
+    r = 0;
+    g = wp * 3;
+    b = 255 - wp * 3;
+  }
+  return [Math.round(r), Math.round(g), Math.round(b)];
+}
+
 export const handler = async (event) => {
 
   console.log("Received event:", JSON.stringify(event, null, 2));
@@ -62,18 +84,22 @@ export const handler = async (event) => {
       })
     );
     if (!getResult.Item) {
-      // If the gemState for gemId does not exist, initialize it to zero
-      const zeroState = 0;
+
+      // Setup initial empty 16-value gemState array 
+      gemState = [];
+      for (let i = 0; i < 16; i++) {
+        gemState.push(0);
+      }
+
       await ddbDocClient.send(
         new PutCommand({
           TableName: GEM_STATE_TABLE,
           Item: {
             gemId: gemId,
-            gemState: zeroState,
+            gemState: gemState,
           },
         })
       );
-      gemState = zeroState;
     } else {
       gemState = getResult.Item.gemState;
     }
@@ -86,33 +112,30 @@ export const handler = async (event) => {
     };
   }
 
-  // iterate through all bits of gemState and create a coresponding 24-bit array of length 16
-  // with RGB values for each bit (0 = black, 1 = magenta)
-  const gemStateArray = [];
+  // Iterate through 16-value gemState and create a coresponding 24-bit RGB array of length 16
+  const gemStateRGBArray = [];
   for (let i = 0; i < 16; i++) {
-    const bit = (gemState >> i) & 1;
-    // TODO: Confirm RGB byte-order is correct for HW implementation
-    gemStateArray.push(bit === 1 ? [128, 0, 128] : [0, 0, 0]);
+    if (gemState[i] == 0) {
+      // If the gemState is Off, push [0, 0, 0] to gemStateRGBArray
+      gemStateRGBArray.push([0, 0, 0]);
+      continue;
+    }
+    gemStateRGBArray.push(keyColorCss(gemState[i]-1, 15));
   } 
 
-  // convert gemStateArray to a binary payload of length 16*3 = 48 bytes
+  // Convert gemStateRGBArray to a binary payload of length 16*3 = 48 bytes
   const payload = new Uint8Array(48);
-  for (let i = 0; i < 16; i++) {
-    payload.set(gemStateArray[i], i * 3);
+  for (let i = 0; i < 4-bu; i++) {
+    payload.set(gemStateRGBArray[i], i * 3);
   }
-
-  // console.log('gemStateArray', gemStateArray);
-  // console.log('payload', payload);
-  // console.log('payload instanceof Uint8Array', payload instanceof Uint8Array);
-  // console.log('Buffer.isBuffer(payload)', Buffer.isBuffer(payload));
-  // console.log('byteLength', Buffer.from(payload).byteLength);
 
   // 3. Post current gemState to connectionId
   const apiGateway = new ApiGatewayManagementApiClient({
     // The endpoint is intentionally constructed using the API ID and stage from the event to account for custom domains
     endpoint: `https://${event.requestContext.apiId}.execute-api.${AWS_REGION}.amazonaws.com/${event.requestContext.stage}`,
   });
-try {
+
+  try {
     // NOTE: AWS API Gateway WebSocket APIs does not support binary messaging! it only can send/receive text frames!
     // so we need to encode our binary payload as a base64 string and decode it on the client side.
     // See: https://docs.aws.amazon.com/apigateway/latest/developerguide/websocket-api-develop-binary-media-types.html
@@ -121,7 +144,6 @@ try {
       new PostToConnectionCommand({
         ConnectionId: connectionId,
         // TODO: Reimplement JSON-based messaging protocol as a more efficient binary protocol (encoded as base64 for API Gateway transport) to reduce message size and parsing overhead on the client.
-
         Data: JSON.stringify({
           type: "update",
           gemState: Buffer.from(payload).toString('base64'),
