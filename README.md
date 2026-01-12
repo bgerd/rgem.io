@@ -44,7 +44,7 @@ sam validate --lint
 
 ```bash
 # Must be re-run whenever handlers or template.yaml updated
-sam build & sam package 
+sam build && sam package 
 ```
 
 #### 3. Deploy CloudFormation stack from uploaded S3 artifacts
@@ -69,13 +69,13 @@ sam deploy --config-env prod
 #### 4. Build, Package, and Deploy React Frontend 
 
 ```bash
-# Deploys frontend to app-dev.rgen.io
+# Deploys frontend to app-dev.rgem.io
 ./infra/scripts/deploy-frontend.sh dev
 
-# Deploys frontend to app-stage.rgen.io
+# Deploys frontend to app-stage.rgem.io
 ./infra/scripts/deploy-frontend.sh stage
 
-# Deploys frontend to app-stage.rgen.io
+# Deploys frontend to app.rgem.io
 ./infra/scripts/deploy-frontend.sh prod
 ```
 
@@ -147,8 +147,9 @@ The connection will then be subscribed to  `<gemId>` and it will immediately rec
 
 ```
 > { "type": "hello", "gemId": "<gemId>" }
-< { "type":"update", "gemState": ... }
+< { "type":"update", "gemState": "<base64-48-bytes>" }
 ```
+Note: `gemState` is a base64-encoded 48-byte payload representing 16 RGB triplets (16×3 bytes).
 
 #### 4.c. To test **toggle** websocket function send the following JSON messages over a connected websocket subscribed to `<gemId>`
 
@@ -159,7 +160,7 @@ The connection will then be subscribed to  `<gemId>` and it will immediately rec
 All connected websockets subscribed to `<gemId>` should immediately receive the following:
 
 ```
-< { "type":"update", "gemState": 0 }
+< { "type":"update", "gemState": "<base64-48-bytes>" }
 ```
 
 #### 5. To test the **schedhb** function, all connected websockets subscribed to **ANY** `<gemId>` should receive the following every 9 minutes:
@@ -174,14 +175,15 @@ All connected websockets subscribed to `<gemId>` should immediately receive the 
 $ curl -X POST \ 
   https://<RGempadHttpApi-ID>.execute-api.<YOUR-REGION>.amazonaws.com/Prod/gem/<gemId> \
   -H "Content-Type: application/json" \
-  -d <gemState>
+  --data-raw '[0,6,6,0,6,2,2,6,0,4,4,0,2,5,5,1]'
 < { "gemId":"<gemId>", "echo": <gemState> }
 ```
 
 All connected websockets subscribed to `<gemId>` should immediately receive the following:
 
 ```
-< { "type":"update", "gemState": <gemState> }
+< { "type":"update", "gemState": "<base64-48-bytes>" }
 ```
+Note: The HTTP response echoes the raw array, while WebSocket clients receive the encoded grid payload.
 
-#### **Note:** that fixed `dev`, `stage`, `prod` env specific endpoints can be used in place of `excute-api` endpoints
+#### **Note:** fixed `dev`, `stage`, `prod` custom domains can be used in place of `execute-api` endpoints. When using custom domains, omit the `/Prod` suffix (e.g., `wss://ws-dev.rgem.io`).
