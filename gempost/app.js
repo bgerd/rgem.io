@@ -1,3 +1,26 @@
+/**
+ * AWS Lambda handler for processing POST requests to /gem/{gemId}.
+ * 
+ * This function performs the following tasks:
+ * 1. Extracts the `gemId` from the path parameters.
+ * 2. Parses the request body to retrieve the new `gemState`.
+ * 3. Upserts the `gemState` into the `GEM_STATE_TABLE` in DynamoDB.
+ * 4. Scans the `CONNECTIONS_TABLE` to find all connected WebSocket clients associated with the `gemId`.
+ * 5. Broadcasts the updated `gemState` to all connected WebSocket clients.
+ * 6. Handles stale WebSocket connections by removing them from the `CONNECTIONS_TABLE`.
+ * 
+ * @param {Object} event - The Lambda event object.
+ * @param {Object} event.pathParameters - The path parameters from the API Gateway request.
+ * @param {string} event.pathParameters.gemId - The ID of the gem being updated.
+ * @param {string} event.body - The JSON string representing the new gem state.
+ * 
+ * @returns {Promise<Object>} - The HTTP response object.
+ * @property {number} statusCode - The HTTP status code of the response.
+ * @property {string} body - The JSON stringified response body containing the `gemId` and echoed `gemState`.
+ * 
+ * @throws {Error} - Returns a 400 status code for missing or invalid input, 
+ *                   and a 500 status code for internal server errors.
+ */
 // gempost/app.js
 
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
@@ -107,10 +130,10 @@ export const handler = async (event) => {
       })
     );
   } catch (err) {
-    console.log("Failed to put into CONNECTIONS_TABLE:", err);
+    console.log("Failed to put into GEM_STATE_TABLE:", err);
     return {
       statusCode: 500,
-      body: "Failed to put into CONNECTIONS_TABLE: " + JSON.stringify(err),
+      body: "Failed to put into GEM_STATE_TABLE: " + JSON.stringify(err),
     };
   }
 
