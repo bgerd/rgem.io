@@ -4,10 +4,12 @@
  * This function performs the following tasks:
  * 1. Extracts the `gemId` from the path parameters.
  * 2. Parses the request body to retrieve the new `gemState`.
- * 3. Upserts the `gemState` into the `GEM_STATE_TABLE` in DynamoDB.
- * 4. Scans the `CONNECTIONS_TABLE` to find all connected WebSocket clients associated with the `gemId`.
- * 5. Broadcasts the updated `gemState` to all connected WebSocket clients.
- * 6. Handles stale WebSocket connections by removing them from the `CONNECTIONS_TABLE`.
+ * 3. Validates and clamps the `gemState` values to a defined range.
+ * 4. Upserts the `gemState` into the `GEM_STATE_TABLE` in DynamoDB.
+ * 5. Converts the `gemState` into an RGB array and binary payload.
+ * 6. Scans the `CONNECTIONS_TABLE` to find all connected WebSocket clients associated with the `gemId`.
+ * 7. Broadcasts the updated `gemState` to all connected WebSocket clients.
+ * 8. Handles stale WebSocket connections by removing them from the `CONNECTIONS_TABLE`.
  * 
  * @param {Object} event - The Lambda event object.
  * @param {Object} event.pathParameters - The path parameters from the API Gateway request.
@@ -44,6 +46,37 @@ const websocketApiGateway = new ApiGatewayManagementApiClient({
   endpoint: WS_API_ENDPOINT,
 });
 
+// TODO: Create shared libraries for managing gemState, etc. 
+function keyColorCss(n, max) {
+  const wheelPos = n * 255 / max; 
+  let r = 0, g = 0, b = 0;
+
+  if (wheelPos < 85) {
+    r = wheelPos * 3;
+    g = 255 - wheelPos * 3;
+    b = 0;
+  } else if (wheelPos < 170) {
+    const wp = wheelPos - 85;
+    r = 255 - wp * 3;
+    g = 0;
+    b = wp * 3;
+  } else {
+    const wp = wheelPos - 170;
+    r = 0;
+    g = wp * 3;
+    b = 255 - wp * 3;
+  }
+  return [Math.round(r), Math.round(g), Math.round(b)];
+}
+
+// The gemState is represented as an array of 16 integers,
+// where each integer represents the state of a "gem"
+const GEM_STATE_LENGTH = 16;
+
+// The range of gemState values that map to the color wheel
+// (e.g. 8 means values 1-8 map to the color wheel, and 0 is off)
+const GEM_APP_TOGGLE_RANGE = 8; 
+
 /* TEST ECHO with curl:
   curl -X POST \
   https://<api-id>.execute-api.<region>.amazonaws.com/Prod/gem/<gemId> \
@@ -55,6 +88,9 @@ const websocketApiGateway = new ApiGatewayManagementApiClient({
     "gemId": "<gemId>",
     "echo": "<gemState>"
   }
+
+  Ex. <gemState> [ 0, 6, 6, 0, 6, 2, 2, 6, 0, 4, 4, 0, 2, 5, 5, 1 ]
+  Ex2. <gemState> [ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ]
 */
 
 // Processes POST requests to /gem/{gemId}
@@ -89,6 +125,43 @@ export const handler = async (event) => {
       body: JSON.stringify({ message: "Invalid JSON format in request body" }),
     };
   }
+  if (!Array.isArray(parsedBody)) {
+    return {
+      statusCode: 400,
+      body: JSON.stringify({
+        message: "Body must be a JSON array of numbers",
+      }),
+    };
+  }
+  if (parsedBody.length !== GEM_STATE_LENGTH) {
+    return {
+      statusCode: 400,
+      body: JSON.stringify({
+        message: `Body must be an array of length ${GEM_STATE_LENGTH}`,
+      }),
+    };
+  }
+  // Validate each element is a finite integer; clamp to [0, GEM_APP_TOGGLE_RANGE]
+  let clamped;
+  try {
+    clamped = parsedBody.map((v, i) => {
+      if (typeof v !== "number" || !Number.isFinite(v)) {
+        throw new Error(`Index ${i} must be a finite number`);
+      }
+      if (!Number.isInteger(v)) {
+        throw new Error(`Index ${i} must be an integer`);
+      }
+      return Math.max(0, Math.min(GEM_APP_TOGGLE_RANGE, v));
+    });
+  } catch (validationErr) {
+    return {
+      statusCode: 400,
+      body: JSON.stringify({
+        message: "Invalid gemState array",
+        detail: String(validationErr),
+      }),
+    };
+  }
 
   // Construct the response object with gemId and echoed body
   const responseBody = {
@@ -114,11 +187,10 @@ export const handler = async (event) => {
   //       "Failed to get current gemState from GEM_STATE_TABLE: " +
   //       JSON.stringify(err),
   //   };
-  // }
-
+  // }  
   // Upsert the gemState in the GEM_STATE_TABLE
-  // Use the parsed body as the new gemState
-  let gemState = parsedBody; 
+  // Use the clamped parsed body as the new gemState
+  let gemState = clamped; 
   try {
     await ddbDocClient.send(
       new PutCommand({
@@ -135,6 +207,22 @@ export const handler = async (event) => {
       statusCode: 500,
       body: "Failed to put into GEM_STATE_TABLE: " + JSON.stringify(err),
     };
+  }
+
+  // Iterate through gemState and create a coresponding 24-bit RGB array
+  const gemStateRGBArray = [];
+  for (let i = 0; i < GEM_STATE_LENGTH; i++) {
+    if (gemState[i] == 0) {
+      // If the gemState is Off, push [0, 0, 0] to gemStateRGBArray
+      gemStateRGBArray.push([0, 0, 0]);
+      continue;
+    }
+    gemStateRGBArray.push(keyColorCss(gemState[i]-1, GEM_APP_TOGGLE_RANGE));
+  } 
+  // Convert gemStateRGBArray to a binary payload of length 16*3 = 48 bytes
+  const payload = new Uint8Array(GEM_STATE_LENGTH * 3);
+  for (let i = 0; i < GEM_STATE_LENGTH; i++) {
+    payload.set(gemStateRGBArray[i], i * 3);
   }
 
   // Scan CONNECTIONS_TABLE to find all connected clients associated with this client's gemId
@@ -165,7 +253,7 @@ export const handler = async (event) => {
         ConnectionId: connectionId,
         Data: JSON.stringify({
           type: "update",
-          gemState: gemState,
+          gemState: Buffer.from(payload).toString('base64'),
         }),
       });
       await websocketApiGateway.send(postCmd);
