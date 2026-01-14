@@ -1,0 +1,33 @@
+{
+  "version": 4,
+  "configurations": [
+    {
+      // Boilerplate configuration for Arduino AVR boards to fix IntelliSense issues.
+      // Adjust the paths and defines as needed for your specific board and setup.
+      // TODO. Review and account for custom patches to libraries
+      // TODO. Migrate arduino sketch to PlatformIO to avoid this manual configuration
+      "name": "Arduino AVR",
+      "compilerPath": "${env:HOME}/Library/Arduino15/packages/arduino/tools/avr-gcc/**/bin/avr-g++",
+      "intelliSenseMode": "gcc-x64",
+      "cStandard": "c11",
+      "cppStandard": "c++17",
+      "includePath": [
+        "${workspaceFolder}/**",
+
+        // Arduino core + variant
+        "${env:HOME}/Library/Arduino15/packages/arduino/hardware/avr/**/cores/**",
+        "${env:HOME}/Library/Arduino15/packages/arduino/hardware/avr/**/variants/**",
+
+        // AVR libc + GCC internal includes (this is what provides <avr/io.h>)
+        "${env:HOME}/Library/Arduino15/packages/arduino/tools/avr-gcc/**/avr/include",
+        "${env:HOME}/Library/Arduino15/packages/arduino/tools/avr-gcc/**/lib/gcc/avr/**/include",
+        "${env:HOME}/Library/Arduino15/packages/arduino/tools/avr-gcc/**/lib/gcc/avr/**/include-fixed",
+
+        // Libraries
+        "${env:HOME}/Documents/Arduino/libraries/**",
+        "${env:HOME}/Library/Arduino15/packages/**/libraries/**"
+      ],
+      "defines": ["ARDUINO_AVR_UNO", "F_CPU=16000000L"]
+    }
+  ]
+}
