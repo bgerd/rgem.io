@@ -6,8 +6,38 @@
 namespace Keypad {
   const int num_pixels = NEO_TRELLIS_NUM_KEYS;
   Adafruit_NeoTrellis trellis;
+  
+  // Framebuffer for gem state and dirty flag
   uint32_t gem_state[16];
+  boolean needs_update = false;
+  
   unsigned long loop_timer = 0;
+  uint8_t  interrupt_pin = 10;
+
+  void read() {
+    // detect if trellis interrupt pin is low (meaning data is ready)
+    // instead of polling for new data
+    if(!digitalRead(interrupt_pin)) {
+      trellis.read(false);
+    }
+  }
+
+  // Draw the current gem_state to the pixels
+  void draw() {
+    for (int n = 0; n < 16; n++) {
+      trellis.pixels.setPixelColor(n, gem_state[n]);
+    }
+    trellis.pixels.show();
+    needs_update = false; 
+  } 
+
+  void loop() {
+    read();
+    if (needs_update) {
+      draw();
+    }
+    delay(2);
+  }
 
   // Returns a fixed Color for a given buttonIndex
   uint32_t keyColor(int buttonIndex) {
@@ -28,27 +58,23 @@ namespace Keypad {
   
   // Update the state of the pixels based on the given state
   void update(uint16_t state) {
+    needs_update = true;
     for (int n = 0; n < 16; n++) {
       if(((1 << n) & state) == (1 << n)) {
         uint32_t color = keyColor(n);
-        trellis.pixels.setPixelColor(n, color);
         gem_state[n] = color;
       } else {
-        trellis.pixels.setPixelColor(n, 0);
         gem_state[n] = 0;     
       }
     }
-    trellis.pixels.show();
   }
 
   // Update the state of the pixels based on the given RGB state
   void updateRGB(uint32_t *rgb_state) {
-
+    needs_update = true;
     for (int n = 0; n < 16; n++) {
-      trellis.pixels.setPixelColor(n, rgb_state[n]);
       gem_state[n] = rgb_state[n];
     }
-    trellis.pixels.show();
   }
 
   void turnOnAll() {
@@ -59,6 +85,8 @@ namespace Keypad {
     update(0x0000);
   }
 
+  // Note that this is a blocking animation that
+  // also clears the gem_state framebuffer 
   void showCascade() {
     for (uint16_t i=0; i<num_pixels; i++) {
       trellis.pixels.setPixelColor(i, keyColor(i));
@@ -67,6 +95,7 @@ namespace Keypad {
     }
     for (uint16_t i=0; i<num_pixels; i++) {
       trellis.pixels.setPixelColor(i, 0x000000);
+      gem_state[i] = 0;
       trellis.pixels.show();
       delay(50);
     }
@@ -85,7 +114,7 @@ namespace Keypad {
     } else {
       loop_timer = 0;
     }
-    trellis.read();
+    loop();
   }
 
   size_t PATTERN_SEEK_LEN = 8;
@@ -133,11 +162,11 @@ namespace Keypad {
     loopPattern(PATTERN_WARNING, PATTERN_WARNING_LEN, delay);
   } 
 
-  void loop() {
-    trellis.read();
-  }
-
-  void init(TrellisCallback(*onKeyPress)(keyEvent)) {
+  void init(TrellisCallback(*onKeyPress)(keyEvent), uint8_t interruptPin = 10) {
+    
+    // Setup trellis interrupt pin
+    interrupt_pin = interruptPin;
+    pinMode(interrupt_pin, INPUT); 
 
     if (!trellis.begin()) {
       ERROR_PRLN(F("ERROR: Could not start trellis, check wiring?"));
@@ -157,31 +186,55 @@ namespace Keypad {
     }
   }  
 
-
+  // Blocking confirmation blink
   void blinkConfirmation() {
     turnOffAll();
+    draw();
+
     turnOnAll();
+    draw();
     delay(200);
+
     turnOffAll();
-    delay(200);    
+    draw();
+    delay(200);
+    
     turnOnAll();
+    draw();
     delay(200);
+    
     turnOffAll();
+    draw();
   }
 
+  // Blocking error blink
   void blinkError() {
+
     turnOffAll();
+    draw();
+    
     update(PATTERN_ERROR[0]);
+    draw();
     delay(200);
+    
     turnOffAll();
+    draw();
     delay(200);
+    
     update(PATTERN_ERROR[0]);
+    draw();
     delay(200);
+    
     turnOffAll();
+    draw();
     delay(200);
+    
     update(PATTERN_ERROR[0]);
+    draw();
     delay(200);
-    turnOffAll();        
+    
+    turnOffAll();
+    draw();
   }
 
 }

@@ -3,7 +3,8 @@
   The buttons will light up various colors when pressed.
 */
 
-#include "Adafruit_NeoTrellis.h"
+#include <Arduino.h>
+#include <Adafruit_NeoTrellis.h>
 
 Adafruit_NeoTrellis trellis;
 

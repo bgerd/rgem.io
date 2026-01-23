@@ -19,7 +19,8 @@
 #include "WebSocketClient.hpp"
 
 // bgerd
-const int ledPin = 13; // LED pin for connectivity status indicator
+const uint8_t interruptPin = 10; // Pin connected to the NeoTrellis interrupt output
+const uint8_t ledPin = 13; // LED pin for connectivity status indicator
 
 // Configure State Machine
 enum Mode { BOOT, PROVISIONING, WIFI_DISCONNECTED, WIFI_CONNECTED, WSOCKET_CONNECTED};
@@ -137,7 +138,7 @@ void setup() {
   INFO_PRLN(RGEMPAD_CORE_VERSION);
 
   Networking::init();
-  Keypad::init(&onKeyPress);
+  Keypad::init(&onKeyPress, interruptPin);
   HttpConfigServer::init();
 
   WebSocketConnection::init([](const char* payload ) -> void {

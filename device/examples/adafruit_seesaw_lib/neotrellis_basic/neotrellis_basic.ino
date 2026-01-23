@@ -3,7 +3,8 @@
   The interrupt pin is not used in this example.
 */
 
-#include "Adafruit_NeoTrellis.h"
+#include <Arduino.h>
+#include <Adafruit_NeoTrellis.h>
 
 Adafruit_NeoTrellis trellis;
 
