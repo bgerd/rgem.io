@@ -12,14 +12,21 @@ namespace Keypad {
   boolean needs_update = false;
   
   unsigned long loop_timer = 0;
-  uint8_t  interrupt_pin = 10;
+
+  // TODO: Actually wire NeoTrellis INT pin to MCU interrupt pin
+  // uint8_t  interrupt_pin = 10;
 
   void read() {
-    // detect if trellis interrupt pin is low (meaning data is ready)
-    // instead of polling for new data
-    if(!digitalRead(interrupt_pin)) {
-      trellis.read(false);
-    }
+
+    // TODO: Actually wire NeoTrellis INT pin to MCU interrupt pin
+    // // detect if trellis interrupt pin is low (meaning data is ready)
+    // // instead of polling for new data
+    // if(!digitalRead(interrupt_pin)) {
+    //   trellis.read(false);
+    // }
+
+    // For now continue polling
+    trellis.read(true);
   }
 
   // Draw the current gem_state to the pixels
@@ -251,9 +258,10 @@ TrellisCallback handleKeyEvent(keyEvent evt) {
     Keypad::onClick = onClick;
     Keypad::onDoubleClick = onDoubleClick;
 
-    // Setup trellis interrupt pin
-    interrupt_pin = interruptPin;
-    pinMode(interrupt_pin, INPUT); 
+    // TODO: Actually wire NeoTrellis INT pin to MCU interrupt pin
+    // // Setup trellis interrupt pin
+    // interrupt_pin = interruptPin;
+    // pinMode(interrupt_pin, INPUT); 
 
     if (!trellis.begin()) {
       ERROR_PRLN(F("ERROR: Could not start trellis, check wiring?"));
