@@ -61,7 +61,7 @@ namespace WebSocketConnection {
 
       case WStype_PONG:
         // answer to a ping we send
-        INFO_PRLN("[WSc] get pong");
+        // INFO_PRLN("[WSc] get pong");
         break;
 
       default:

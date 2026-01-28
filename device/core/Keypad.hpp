@@ -162,8 +162,95 @@ namespace Keypad {
     loopPattern(PATTERN_WARNING, PATTERN_WARNING_LEN, delay);
   } 
 
-  void init(TrellisCallback(*onKeyPress)(keyEvent), uint8_t interruptPin = 10) {
+// ----- Tuning knobs -----
+static constexpr uint16_t NUM_KEYS      = NEO_TRELLIS_NUM_KEYS; // 16
+static constexpr uint32_t DBLCLICK_MS   = 400;  // typical desktop-ish dblclick window
+
+static void (*onPress)(uint8_t) = nullptr;
+static void (*onRelease)(uint8_t) = nullptr;
+static void(*onClick)(uint8_t, uint32_t) = nullptr; 
+static void(*onDoubleClick)(uint8_t) = nullptr;
+
+// ----- Per-key state -----
+static bool     waitingSecond[NUM_KEYS]  = {false}; // after first click, waiting for second
+static uint32_t firstClickMs[NUM_KEYS]   = {0};
+static uint32_t mouseDownkMs[NUM_KEYS]   = {0};
+
+static void logEvent(uint8_t key, const __FlashStringHelper* name) {
+  INFO_PRINT(F("[Keypad] key "));
+  INFO_PRINT(key);
+  INFO_PRINT(F(" (x="));
+  INFO_PRINT(NEO_TRELLIS_X(key));
+  INFO_PRINT(F(",y="));
+  INFO_PRINT(NEO_TRELLIS_Y(key));
+  INFO_PRINT(F(") : "));
+  INFO_PRINT(name);
+  INFO_PRINT(F(" @ "));
+  INFO_PRLN(millis());
+}
+
+// Called on every key RELEASE (mouseup), because clicks happen on release.
+static void handleReleaseAsBrowserClick(uint8_t key) {
+  const uint32_t now = millis();
+
+  // 1) Browser-like click fires immediately on release.
+  const uint32_t pressDuration = now - mouseDownkMs[key];
+  onClick(key, pressDuration);
+
+  // 2) Decide whether this is click#1 or click#2 of a potential double-click.
+  if (!waitingSecond[key]) {
+    // First click in a potential pair: arm the double-click window.
+    waitingSecond[key] = true;
+    firstClickMs[key]  = now;
+
+  } else {
+    // We were waiting for a second click.
+    const uint32_t dt = now - firstClickMs[key];
+    if (dt <= DBLCLICK_MS) {
+      // Success: this is a browser-like dblclick AFTER two clicks.
+      onDoubleClick(key);
+
+    } else {
+      // Too late: treat this as a new "first click" (start a new window).
+      waitingSecond[key] = true;
+      firstClickMs[key]  = now;
+    }
+  }
+}
+
+TrellisCallback handleKeyEvent(keyEvent evt) {
+  const uint8_t key = evt.bit.NUM;
+
+  if (evt.bit.EDGE == SEESAW_KEYPAD_EDGE_RISING) {    
+    // Pressed
+    mouseDownkMs[key] = millis();  
+    logEvent(key, F("button_press"));
+    onPress(key);
+
+  } else if (evt.bit.EDGE == SEESAW_KEYPAD_EDGE_FALLING) {
+    // Released
+    logEvent(key, F("button_release"));
+    onRelease(key);
+
+    // Now model browser click/dblclick semantics on RELEASE:
+    handleReleaseAsBrowserClick(key);
+  }
+
+  return 0;
+}
+
+  void init(
+    void(*onPress)(uint8_t),
+    void(*onRelease)(uint8_t),
+    void(*onClick)(uint8_t, uint32_t),
+    void(*onDoubleClick)(uint8_t),
+    uint8_t interruptPin = 10) {
     
+    Keypad::onPress = onPress;
+    Keypad::onRelease = onRelease;
+    Keypad::onClick = onClick;
+    Keypad::onDoubleClick = onDoubleClick;
+
     // Setup trellis interrupt pin
     interrupt_pin = interruptPin;
     pinMode(interrupt_pin, INPUT); 
@@ -176,7 +263,7 @@ namespace Keypad {
       for(int i=0; i<NEO_TRELLIS_NUM_KEYS; i++){
         trellis.activateKey(i, SEESAW_KEYPAD_EDGE_RISING);
         trellis.activateKey(i, SEESAW_KEYPAD_EDGE_FALLING);
-        trellis.registerCallback(i, onKeyPress);
+        trellis.registerCallback(i, handleKeyEvent);
       }
 
       // Show boot-up animation and enter DEFAULT mode

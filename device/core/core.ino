@@ -57,47 +57,52 @@ const uint16_t CORNER_KEYS_MASK = (1<<0)|(1<<3)|(1<<12)|(1<<15);
 const uint32_t CORNER_HOLD_MS = 5000;  // 5 seconds
 uint16_t keys_pressed = 0x00;
 
-TrellisCallback onKeyPress(keyEvent evt){
+void onPress(uint8_t key) {
+  INFO_PRINT(F("[Keypad] key_pressed: "));
+  INFO_PRLN(key);
+  keys_pressed = keys_pressed | (1 << key);
 
-  // Check is the pad pressed?
-  if (evt.bit.EDGE == SEESAW_KEYPAD_EDGE_RISING) {
+  if (next_state == WSOCKET_CONNECTED && last_state == WSOCKET_CONNECTED) {
 
-    // INFO_PRINT(F("key pressed: "));
-    // INFO_PRLN(evt.bit.NUM);
+    ASSERT_PRLN(WebSocketConnection::websocket_client.isConnected(), F("ERROR: Invalid CONNECTED state. No websocket connection."));
+    ASSERT_PRLN((WiFi.status() == WL_CONNECTED), F("ERROR: Invalid CONNECTED state. No wifi connection"));
 
-    // Td. Look into distinguishing single and double keypress events
-    keys_pressed = keys_pressed | (1 << evt.bit.NUM);
+    // Build json json_doc to emit toogle to rgempad-backend
+    json_doc.clear();
+    json_doc[F("type")] = F("toggle");
+    json_doc[F("idx")] = key;
+    
+    // Note. Calculated 33-34 bytes to {"type": "toggle","buttonIndex":XX}
+    String msg;
+    msg.reserve(35);
 
-    // Todo: Reconsider whether we need to evaluate next_state / last_satate here
-    if (next_state == WSOCKET_CONNECTED && last_state == WSOCKET_CONNECTED) {
+    // Note. Tried and failed to wrap WebSocketClient in AduinoJson Custom Writer
+    // per: https://arduinojson.org/v7/api/json/serializejson/#custom-writer
+    serializeJson(json_doc, msg);
 
-      ASSERT_PRLN(WebSocketConnection::websocket_client.isConnected(), F("ERROR: Invalid CONNECTED state. No websocket connection."));
-      ASSERT_PRLN((WiFi.status() == WL_CONNECTED), F("ERROR: Invalid CONNECTED state. No wifi connection"));
-
-      // Build json json_doc to emit toogle to rgempad-backend
-      json_doc.clear();
-      json_doc[F("type")] = F("toggle");
-      json_doc[F("idx")] = evt.bit.NUM;
-      
-      // Note. Calculated 33-34 bytes to {"type": "toggle","buttonIndex":XX}
-      String msg;
-      msg.reserve(35);
-
-      // Note. Tried and failed to wrap WebSocketClient in AduinoJson Custom Writer
-      // per: https://arduinojson.org/v7/api/json/serializejson/#custom-writer
-      serializeJson(json_doc, msg);
-
-      INFO_PRINT(F("Sending: "));
-      INFO_PRLN(msg);
-      WebSocketConnection::websocket_client.sendTXT(msg);
-    }
-
-  } else if (evt.bit.EDGE == SEESAW_KEYPAD_EDGE_FALLING) {
-    // or is the pad released?
-    keys_pressed = keys_pressed & ! (1 << evt.bit.NUM);
+    INFO_PRINT(F("[WSc TX] Sending: "));
+    INFO_PRLN(msg);
+    WebSocketConnection::websocket_client.sendTXT(msg);
   }
-  return 0;
-} 
+  
+}
+
+void onRelease(uint8_t key) {
+  keys_pressed = keys_pressed & ~(1 << key);
+}
+
+void onClick(uint8_t key, uint32_t pressDuration) {
+  INFO_PRINT(F("[Keypad] key_clicked: "));
+  INFO_PRINT(key);
+  INFO_PRINT(F(" (press duration ms: "));
+  INFO_PRINT(pressDuration);
+  INFO_PRLN(F(")"));
+}
+
+void onDoubleClick(uint8_t key) {
+  INFO_PRINT(F("[Keypad] key_double_clicked: "));
+  INFO_PRLN(key);
+}
 
 // bool isResetButtonHold(std::function<void()> doResetCallback) {
 bool isResetButtonHold() {
@@ -106,7 +111,7 @@ bool isResetButtonHold() {
   if((keys_pressed & CORNER_KEYS_MASK) == CORNER_KEYS_MASK) {
 
     long cornerHoldStart = 0;
-    INFO_PRLN(F("Corner Hold Detected"));
+    INFO_PRLN(F("[Keypad] corner_hold_detected"));
     do {
       if(0 == cornerHoldStart) {
         cornerHoldStart = millis();
@@ -120,7 +125,7 @@ bool isResetButtonHold() {
       Keypad::loop();
     } while((keys_pressed & CORNER_KEYS_MASK) == CORNER_KEYS_MASK);
 
-    INFO_PRLN(F("Corner Hold Release Detected"));
+    INFO_PRLN(F("[Keypad] corner_hold_release_detected"));
     cornerHoldStart = 0;
   }
   return false;
@@ -138,7 +143,12 @@ void setup() {
   INFO_PRLN(RGEMPAD_CORE_VERSION);
 
   Networking::init();
-  Keypad::init(&onKeyPress, interruptPin);
+  Keypad::init(
+    &onPress,
+    &onRelease,
+    &onClick,
+    &onDoubleClick, 
+    interruptPin);
   HttpConfigServer::init();
 
   WebSocketConnection::init([](const char* payload ) -> void {
