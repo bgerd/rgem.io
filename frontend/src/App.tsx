@@ -12,17 +12,22 @@ import { useWebSocket } from "./lib/WebSocketProvider";
 // Hard-coded RGEM IDs for now.
 const RGEM_IDS: string[] = ["test-1", "test-2", "default"];
 
-// Convert a 48-byte (16 x 24-bit RGB) gemState payload into a GridState.
-function gemStateToGridState(gemState: Uint8Array): GridState {
+// Helper to convert a base64-encoded gemState string into a GridState
+function decodeGemStateString(gemStateString: string): GridState {
   const cells: GridState = [];
 
-  for (let idx = 0; idx < 16; idx++) {
-    // TODO: Confirm RGB byte-order is correct for HW implementation
+  // Convert base64-encoded gemStateString into raw bytes
+  const gemStateRaw = atob(gemStateString);
 
+  // Convert a 48-byte (16 x 24-bit/3-byte RGB) gemStateRaw into a gemStateBuf.
+  const gemStateBuf = Uint8Array.from(gemStateRaw, c => c.charCodeAt(0));
+
+  // Convert gemStateBuf into GridState
+  for (let idx = 0; idx < 16; idx++) {
     cells.push({
-      r: gemState[idx * 3],
-      g: gemState[idx * 3 + 1],
-      b: gemState[idx * 3 + 2]
+      r: gemStateBuf[idx * 3],
+      g: gemStateBuf[idx * 3 + 1],
+      b: gemStateBuf[idx * 3 + 2]
     }); 
   }
 
@@ -31,7 +36,7 @@ function gemStateToGridState(gemState: Uint8Array): GridState {
 
 // Helper to create a default "all off" grid.
 function createDefaultGrid(): GridState {
-  return gemStateToGridState(new Uint8Array(48));
+  return Array.from({ length: 16 }, () => ({ r: 0, g: 0, b: 0 }));
 }
 
 export const App: React.FC = () => {
@@ -127,13 +132,7 @@ export const App: React.FC = () => {
         
         // Guard: only handle the first valid update
         if (typed.type === "update" && typeof typed.gemState === "string") {
-          // Convert gemState from base64 string back to Uint8Array
-          const decoded = atob(typed.gemState);
-          const payload = new Uint8Array(decoded.length);
-          for (let i = 0; i < decoded.length; i++) {
-            payload[i] = decoded.charCodeAt(i);
-          } 
-          const initialGrid = gemStateToGridState(payload);
+          const initialGrid = decodeGemStateString(typed.gemState);
 
           // Unsubscribe immediately since we only want the first update
           unsubscribeFirstUpdateHandler();
@@ -192,13 +191,7 @@ export const App: React.FC = () => {
       // TODO: Reimplement JSON-based messaging protocol as a more efficient binary protocol (encoded as base64 for API Gateway transport) to reduce message size and parsing overhead on the client.
       const typed = msg as { type?: string; gemState?: unknown };
       if (typed.type === "update" && typeof typed.gemState === "string") {
-        // Convert gemState from base64 string back to Uint8Array
-        const decoded = atob(typed.gemState);
-        const payload = new Uint8Array(decoded.length);
-        for (let i = 0; i < decoded.length; i++) {
-          payload[i] = decoded.charCodeAt(i);
-        } 
-        const nextGrid = gemStateToGridState(payload);
+        const nextGrid = decodeGemStateString(typed.gemState);
         setGridState(nextGrid);
       } else if (typed.type === "pong" || typed.type === "hb") {
         // Ignore pong messages in the update handler; they are for connection health monitoring.
