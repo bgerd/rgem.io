@@ -235,12 +235,24 @@ export const App: React.FC = () => {
   };
 
   // Handle a click on a grid cell in the RGemGridPage
-  // Sends: { type: "toggle", idx: cellId } via WebSocket
+  // Sends: { type: "toggle", e: "keydown", num: cellId } via WebSocket
   const handleGridClick = (cellId: number) => {
     console.log(`[App handleGridClick] ${cellId}`);
     sendJson({
       type: "toggle",
-      idx: cellId,
+      e: "keydown",
+      num: cellId,
+    });
+  };
+
+  // Handle a double click on a grid cell in the RGemGridPage
+  // Sends: { type: "toggle", e: "dblclick", num: cellId } via WebSocket
+  const handleGridDblClick = (cellId: number) => {
+    console.log(`[App handleGridDblClick] ${cellId}`);
+    sendJson({
+      type: "toggle",
+      e: "dblclick",
+      num: cellId,
     });
   };
 
@@ -311,7 +323,12 @@ export const App: React.FC = () => {
   return (
     <div className="rgem-app-root">
       {/* Underlying grid is always rendered. Mode simply affects overlay. */}
-      <RGemGridPage cells={gridState} onCellClick={handleGridClick} isLabelVisible={isCellIdVisible} />
+      <RGemGridPage
+        cells={gridState}
+        onCellClick={handleGridClick}
+        onCellDoubleClick={handleGridDblClick}
+        isLabelVisible={isCellIdVisible}
+      />
 
       {/* Configuration mode: show selector modal over the grid */}
       {mode === "configuration" && (

@@ -14,7 +14,8 @@
 // TODO: Revisit WEBSOCKET_URL. What is it for? 
 
 #warning SSL Certificates for WEBSOCKET_HOST MUST be pre-loaded onto winc1500 firmware
-#define WEBSOCKET_HOST "ws-stage.rgem.io"
+// TODO: Parameterize WEBSOCKET_HOST with build system
+#define WEBSOCKET_HOST "ws-dev.rgem.io"
 #define WEBSOCKET_PORT 443
 #define WEBSOCKET_URL "/"
 // Note that WebSocketsClient_Generic effectively blocks when trying to connect

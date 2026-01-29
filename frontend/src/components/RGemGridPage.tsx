@@ -5,6 +5,7 @@ import type { GridState, RgbColor } from "../types/grid";
 export type RGemGridPageProps = {
   cells: GridState;
   onCellClick: (cellId: number) => void;
+  onCellDoubleClick: (cellId: number) => void;
   isLabelVisible: boolean;
 };
 
@@ -24,6 +25,7 @@ function logicalColorToCss({ r, g, b }: RgbColor): string {
 export const RGemGridPage: React.FC<RGemGridPageProps> = ({
   cells,
   onCellClick,
+  onCellDoubleClick,
   isLabelVisible
 }) => {
   return (
@@ -39,6 +41,7 @@ export const RGemGridPage: React.FC<RGemGridPageProps> = ({
             className="rgem-grid-cell"
             style={{ backgroundColor: logicalColorToCss(color) }}
             onClick={() => onCellClick(cellId)}
+            onDoubleClick={() => onCellDoubleClick(cellId)}
             // Accessibility attributes:
             // - role/button implied by <button>
             // - keyboard interaction handled automatically

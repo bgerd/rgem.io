@@ -70,11 +70,12 @@ void onPress(uint8_t key) {
     // Build json json_doc to emit toogle to rgempad-backend
     json_doc.clear();
     json_doc[F("type")] = F("toggle");
-    json_doc[F("idx")] = key;
+    json_doc[F("e")] = F("keydown");
+    json_doc[F("num")] = key;
     
-    // Note. Calculated 33-34 bytes to {"type": "toggle","buttonIndex":XX}
+    // Note. Calculated 40 bytes to {"type":"toggle","e":"keydown","num":XX}
     String msg;
-    msg.reserve(35);
+    msg.reserve(45);
 
     // Note. Tried and failed to wrap WebSocketClient in AduinoJson Custom Writer
     // per: https://arduinojson.org/v7/api/json/serializejson/#custom-writer
@@ -102,6 +103,30 @@ void onClick(uint8_t key, uint32_t pressDuration) {
 void onDoubleClick(uint8_t key) {
   INFO_PRINT(F("[Keypad] key_double_clicked: "));
   INFO_PRLN(key);
+
+  if (next_state == WSOCKET_CONNECTED && last_state == WSOCKET_CONNECTED) {
+
+    ASSERT_PRLN(WebSocketConnection::websocket_client.isConnected(), F("ERROR: Invalid CONNECTED state. No websocket connection."));
+    ASSERT_PRLN((WiFi.status() == WL_CONNECTED), F("ERROR: Invalid CONNECTED state. No wifi connection"));
+
+    // Build json json_doc to emit toogle to rgempad-backend
+    json_doc.clear();
+    json_doc[F("type")] = F("toggle");
+    json_doc[F("e")] = F("dblclick");
+    json_doc[F("num")] = key;
+    
+    // Note. Calculated 41 bytes to {"type":"toggle","e":"dblclick","num":XX}
+    String msg;
+    msg.reserve(45);
+
+    // Note. Tried and failed to wrap WebSocketClient in AduinoJson Custom Writer
+    // per: https://arduinojson.org/v7/api/json/serializejson/#custom-writer
+    serializeJson(json_doc, msg);
+
+    INFO_PRINT(F("[WSc TX] Sending: "));
+    INFO_PRLN(msg);
+    WebSocketConnection::websocket_client.sendTXT(msg);
+  }  
 }
 
 // bool isResetButtonHold(std::function<void()> doResetCallback) {

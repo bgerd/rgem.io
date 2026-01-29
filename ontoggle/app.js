@@ -52,13 +52,19 @@ export const handler = async (event) => {
   // console.log("Received event:", JSON.stringify(event, null, 2));
   // console.log(process.env);
 
-  // Note that we expect a JSON body with: { "type": "toggle", "idx": 0-15 }
+  // Note that we expect a JSON body with:
+  //  {
+  //      "type": "toggle",
+  //         "e": "keydown" OR "dblclick",
+  //       "num": 0-15
+  //  }
   // AND that the client has already sent a "hello" message to associate its connectionId with a gemId.
   const connectionId = event.requestContext.connectionId;
 
   // TODO: Reimplement in TypeScript with proper types, and properly validate and sanitize all inputs.
-  // Currently we are not handling when idx is undefined resulting in toggling all bits (BUG)
-  const idx = JSON.parse(event.body).idx;
+  // Currently we are not handling when num is undefined resulting in toggling all bits (BUG)
+  const num = JSON.parse(event.body).num;
+  const eventType = JSON.parse(event.body).e;
 
   // 1. Look up the gemId associated with this connectionId in the CONNECTIONS_TABLE
   let gemId;
@@ -87,7 +93,7 @@ export const handler = async (event) => {
     };
   }
 
-  // 2. Toggle the gemId's gemState in the GEM_STATE_TABLE for given idx
+  // 2. Toggle the gemId's gemState in the GEM_STATE_TABLE for given num
   // 2.1 First, get the current gemState for the gemId
   let gemState;
   try {
@@ -108,9 +114,15 @@ export const handler = async (event) => {
     };
   }
   
-  // 2.2 Compute the new gemState: increment the value at idx and wrap around at GEM_APP_TOGGLE_RANGE
-  gemState[idx] = (gemState[idx] + 1) % GEM_APP_TOGGLE_RANGE; 
-
+  // 2.2 Compute the new gemState: increment the value at num and wrap around at GEM_APP_TOGGLE_RANGE
+  if(eventType === "dblclick") {
+    // On double click, turn off the gem (set to 0)
+    gemState[num] = 0;
+  } else {
+    // On keydown (single click), increment the gem state
+    gemState[num] = (gemState[num] + 1) % GEM_APP_TOGGLE_RANGE; 
+  }
+  
   // 2.3 Update the gemState in the GEM_STATE_TABLE
   try {
     await ddbDocClient.send(
