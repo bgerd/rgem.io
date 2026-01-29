@@ -46,13 +46,13 @@ const GEM_STATE_LENGTH = 16;
 const GEM_APP_TOGGLE_RANGE = 8; 
 
 export const handler = async (event) => {
-
-  console.log("Received event:", JSON.stringify(event, null, 2));
-  console.log(process.env);
+  // console.log("Received event:", JSON.stringify(event, null, 2));
+  // console.log(process.env);
 
   // Note that we expect a JSON body with: { "type": "hello", "gemId": "some-gemId" }
   const connectionId = event.requestContext.connectionId;
   const gemId = JSON.parse(event.body).gemId;
+  const currentTimeMillis = Date.now();
 
   // Validate gemId
   if (!gemId) {
@@ -90,11 +90,16 @@ export const handler = async (event) => {
         Key: {
           gemId: gemId,
         },
+        // BUG-FIX: Critical that we read the latest gemState after writes
+        // Default false. A read may briefly return stale data for up to ~1 second after a write. 
+        // Setting to true to ensure we get the latest data. It costs 2x read capacity units.
+        ConsistentRead: true,
       })
     );
     if (!getResult.Item) {
 
       // Setup initial empty gemState array
+      // NOTE:BUILD: MUST clear GEM_STATE_TABLE whenever the structure of gemState changes!
       gemState = [];
       for (let i = 0; i < GEM_STATE_LENGTH; i++) {
         gemState.push(0);
@@ -120,6 +125,9 @@ export const handler = async (event) => {
         "Failed to get or initialize GEM_STATE_TABLE: " + JSON.stringify(err),
     };
   }
+  // TODO: Reimplement JSON-based messaging protocol as a more efficient binary protocol (encoded as base64 for API Gateway transport) to reduce message size and parsing overhead on the client.
+  // 2.1 Build the update JSON message to send to all connected clients
+
   // Iterate through gemState array and
   // create a coresponding 24-bit RGB array
   const gemStateRGBArray = [];
@@ -132,11 +140,23 @@ export const handler = async (event) => {
     gemStateRGBArray.push(keyColorCss(gemState[i]-1, GEM_APP_TOGGLE_RANGE));
   } 
 
-  // Convert gemStateRGBArray to a binary payload of length 16*3 = 48 bytes
-  const payload = new Uint8Array(GEM_STATE_LENGTH * 3);
+  // Convert gemStateRGBArray to a binary gemStateBuf of length 16*3 = 48 bytes
+  const gemStateBuf = new Uint8Array(GEM_STATE_LENGTH * 3);
   for (let i = 0; i < GEM_STATE_LENGTH; i++) {
-    payload.set(gemStateRGBArray[i], i * 3);
+    gemStateBuf.set(gemStateRGBArray[i], i * 3);
   }
+
+  // Convert currentTimeMillis to a binary buffer of length 8 bytes (Big Endian)
+  // Note: 40% less data to transmit and skip string parsing on clients compared to sending as ISO string
+  const currentTimeMillisBuf = Buffer.alloc(8);
+  currentTimeMillisBuf.writeBigUInt64BE(BigInt(currentTimeMillis));
+
+  const updateMsg = {
+    type: "update",
+    gemState: Buffer.from(gemStateBuf).toString('base64'),
+    ts: Buffer.from(currentTimeMillisBuf).toString('base64'),
+  };
+  const updateMsgStr = JSON.stringify(updateMsg);
 
   // 3. Post current gemState to connectionId
   const apiGateway = new ApiGatewayManagementApiClient({
@@ -146,17 +166,13 @@ export const handler = async (event) => {
 
   try {
     // NOTE: AWS API Gateway WebSocket APIs does not support binary messaging! it only can send/receive text frames!
-    // so we need to encode our binary payload as a base64 string and decode it on the client side.
+    // so we need to encode our binary gemStateBuf as a base64 string and decode it on the client side.
     // See: https://docs.aws.amazon.com/apigateway/latest/developerguide/websocket-api-develop-binary-media-types.html
     // See: https://repost.aws/questions/QUtbrnTNl6RJeseAE6ZCzx9Q/api-gateway-websocket-binary-frames
     await apiGateway.send(
       new PostToConnectionCommand({
         ConnectionId: connectionId,
-        // TODO: Reimplement JSON-based messaging protocol as a more efficient binary protocol (encoded as base64 for API Gateway transport) to reduce message size and parsing overhead on the client.
-        Data: JSON.stringify({
-          type: "update",
-          gemState: Buffer.from(payload).toString('base64'),
-        }),
+        Data: updateMsgStr,
       })
     );
   } catch (err) {

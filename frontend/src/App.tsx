@@ -12,6 +12,20 @@ import { useWebSocket } from "./lib/WebSocketProvider";
 // Hard-coded RGEM IDs for now.
 const RGEM_IDS: string[] = ["test-1", "test-2", "default"];
 
+function decodeTimestampString(timestampString: string): number {
+  // Convert base64-encoded timestampString into raw bytes
+  const timestampRaw = atob(timestampString);
+
+  // Convert a timestampRaw into a Uint8Array.
+  const timestampArray = Uint8Array.from(timestampRaw, c => c.charCodeAt(0));
+
+  //  Read as BigInt (Big-Endian)
+  const view = new DataView(timestampArray.buffer);
+  const timestamp = Number(view.getBigUint64(0));
+
+  return timestamp;
+}
+
 // Helper to convert a base64-encoded gemState string into a GridState
 function decodeGemStateString(gemStateString: string): GridState {
   const cells: GridState = [];
@@ -79,6 +93,9 @@ export const App: React.FC = () => {
     };
   }, []);
 
+  // Track the latest server-side update timestamp
+  const latestUpdateTsRef = useRef<number | null>(null);
+
   // Ref-to-latest pattern: keep latest state in a ref to avoid stale closures in long-lived callbacks.
   const selectedRgemIdRef = useRef<string | null>(null);
   useEffect(() => {
@@ -128,10 +145,12 @@ export const App: React.FC = () => {
       const unsubscribeFirstUpdateHandler = addMessageHandler((msg) => {
 
         // TODO: Reimplement JSON-based messaging protocol as a more efficient binary protocol (encoded as base64 for API Gateway transport) to reduce message size and parsing overhead on the client.
-        const typed = msg as { type?: string; gemState?: unknown };
+        const typed = msg as { type?: string; gemState?: string; ts?: string };
         
         // Guard: only handle the first valid update
-        if (typed.type === "update" && typeof typed.gemState === "string") {
+        if (typed.type === "update" && typeof typed.gemState === "string" && typeof typed.ts === "string") {
+
+          latestUpdateTsRef.current = decodeTimestampString(typed.ts);
           const initialGrid = decodeGemStateString(typed.gemState);
 
           // Unsubscribe immediately since we only want the first update
@@ -139,7 +158,7 @@ export const App: React.FC = () => {
           
           resolve(initialGrid);
         } else {
-            reject(new Error(`Received non-update message or invalid initial gemState, ignoring: ${JSON.stringify(msg)}`));
+          reject(new Error(`Received non-update message or invalid initial gemState, ignoring: ${JSON.stringify(msg)}`));
         }
       });
 
@@ -188,15 +207,25 @@ export const App: React.FC = () => {
     // 5) Register the ongoing inbound stream handler
     const unsubscribeUpdateHandler = addMessageHandler((msg) => {
 
-      // TODO: Reimplement JSON-based messaging protocol as a more efficient binary protocol (encoded as base64 for API Gateway transport) to reduce message size and parsing overhead on the client.
-      const typed = msg as { type?: string; gemState?: unknown };
-      if (typed.type === "update" && typeof typed.gemState === "string") {
-        const nextGrid = decodeGemStateString(typed.gemState);
-        setGridState(nextGrid);
+      const typed = msg as { type?: string; gemState?: string; ts?: string };
+      
+      // Guard: only handle the first valid update
+      if (typed.type === "update" && typeof typed.gemState === "string" && typeof typed.ts === "string") {
+      
+        const timestamp = decodeTimestampString(typed.ts);
+        if(timestamp > latestUpdateTsRef.current!) {
+          latestUpdateTsRef.current = timestamp;
+          const nextGrid = decodeGemStateString(typed.gemState);
+          setGridState(nextGrid);
+          return; 
+        } else {
+          console.warn(`Ignoring out-of-order update (ts: ${timestamp} <= latest: ${latestUpdateTsRef.current})`);
+          return; 
+        }
       } else if (typed.type === "pong" || typed.type === "hb") {
         // Ignore pong messages in the update handler; they are for connection health monitoring.
       } else {
-          console.error("Received non-update message or invalid gemState, ignoring:", msg);
+        console.error("Received non-update message or invalid gemState, ignoring:", msg);
       }
     });
     unsubscribeUpdateHandlerRef.current = unsubscribeUpdateHandler;

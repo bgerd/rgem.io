@@ -34,6 +34,9 @@ JsonDocument json_doc;
 // See: https://github.com/Densaugeo/base64_arduino
 #include <base64.hpp>
 
+// Track latest update timestamp from server
+u_int64_t latestUpdateTs = 0;
+
 ///////////////////////////////
 // Configure flash storage with samd-specific API
 // Td. Reimplement with generic EEPROM API 
@@ -185,29 +188,54 @@ void setup() {
       // Consider how this should actually be impossible ...
       ASSERT_PRLN(WebSocketConnection::websocket_client.isConnected(), F("ERROR: Invalid CONNECTED state"));
 
+      // TODO: Reimplement JSON-based messaging protocol as a more efficient binary protocol (encoded as base64 for API Gateway transport) to reduce message size and parsing overhead on the client.
       deserializeJson(json_doc, payload);
       if (F("hb") == json_doc[F("type")]) {
         // do nothing ..
       } else {
-        
         ASSERT_PRLN((json_doc[F("type")] == "update"), F("ERROR: Invalid message from server"));
+
+        // Handle update message timestamp to ignore out-of-order updates
+        // NOTE: Observed out-of-order messages do not occur in HW as they do on web frontend
+        // presemably due to single threaded nature of sketch loop() vs async nature of web sockets in browser
+
+        // Covert base64 encoded timestamp to uint64_t
+        const char* encodedTs = json_doc[F("ts")];
+        uint8_t decodedTs[8];
+        decode_base64((unsigned char*)encodedTs, decodedTs);
+
+        // Manual Big-Endian to Host conversion
+        uint64_t timestamp =
+          ((uint64_t)decodedTs[0] << 56) | ((uint64_t)decodedTs[1] << 48) |
+          ((uint64_t)decodedTs[2] << 40) | ((uint64_t)decodedTs[3] << 32) |
+          ((uint64_t)decodedTs[4] << 24) | ((uint64_t)decodedTs[5] << 16) |
+          ((uint64_t)decodedTs[6] << 8)  | ((uint64_t)decodedTs[7]);
+
+        if(latestUpdateTs == 0 || timestamp > latestUpdateTs) {
+          latestUpdateTs = timestamp;
+          INFO_PRINT(F("latestUpdateTs: "));
+          INFO_PRLN(latestUpdateTs);
+        } else {
+          INFO_PRLN(F("Stale update message received. Ignoring."));
+          return;
+        } 
 
         // Convert base64 encoded gemState to uint8_t array and update
         // 1. Point directly to the string in the JsonDocument (No copy)
-        const char* encoded = json_doc[F("gemState")]; 
-        if (!encoded) return;
+        const char* encodedGemState = json_doc[F("gemState")]; 
+        if (!encodedGemState) return;
 
         // 2. Use a stack-allocated buffer for speed and safety
         // Note: Given fixed 48-byte payload we need 64 bytes of base64 encoding.
-        uint8_t decodedBuffer[64]; 
+        uint8_t decodedGemState[64]; 
 
         // 3. Perform the decode
-        int actualLen = decode_base64((unsigned char*)encoded, decodedBuffer);
+        decode_base64((unsigned char*)encodedGemState, decodedGemState);
 
         // 4. Convert the decoded RGB byte array to uint32_t array expected by updateRGB
         uint32_t rgb_state[16];
         for (int i = 0; i < 16; i++) {
-          rgb_state[i] = (decodedBuffer[3*i] << 16) | (decodedBuffer[3*i + 1] << 8) | decodedBuffer[3*i + 2];
+          rgb_state[i] = (decodedGemState[3*i] << 16) | (decodedGemState[3*i + 1] << 8) | decodedGemState[3*i + 2];
         }
 
         Keypad::updateRGB(rgb_state);

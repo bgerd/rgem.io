@@ -131,7 +131,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({
     // Called by handleMessage (socket event handler) and sendJson to maintain liveness.
     // TODO: Assert readyState is OPEN before sending ping and considering throwing error
     function scheduleNextPing() {
-      console.log("[WSProvider scheduleNextPing]");
+      // console.log("[WSProvider scheduleNextPing]");
 
       // Clear any existing ping timer since we're rescheduling based on new activity.
       if (pingTimerRef.current)
@@ -149,7 +149,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({
           return;
         }
 
-        console.log("... Sending ping");
+        // console.log("... Sending ping");
         socket.send(JSON.stringify({ type: "ping" }));
         lastTxAtRef.current = Date.now();
 

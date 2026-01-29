@@ -171,9 +171,15 @@ All connected websockets subscribed to `<gemId>` should immediately receive the 
 
 #### 6. To test the **gempost** HTTP function, while connected and subscribed to `<gemID>` via `wscat` as show above, in a seperate terminal POST a JSON message like the following example 
 
+```
+# dev rest_api_host: api-dev.rgem.io
+# stage rest_api_host: api-stage.rgem.io
+# prod rest_api_host: api.rgem.io
+```
+
 ```bash
 $ curl -X POST \ 
-  https://<RGempadHttpApi-ID>.execute-api.<YOUR-REGION>.amazonaws.com/Prod/gem/<gemId> \
+  https://<rest_api_host>/gem/<gemId> \
   -H "Content-Type: application/json" \
   --data-raw '[0,6,6,0,6,2,2,6,0,4,4,0,2,5,5,1]'
 < { "gemId":"<gemId>", "echo": <gemState> }
