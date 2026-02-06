@@ -117,7 +117,7 @@ Resources:
   GemPostFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: gempost/
+      CodeUri: backend/gempost/
       Handler: app.handler
       MemorySize: 256
       Runtime: nodejs20.x
@@ -284,7 +284,7 @@ Resources:
   OnHelloFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: onhello/
+      CodeUri: backend/onhello/
       Handler: app.handler
       MemorySize: 256
       Runtime: nodejs20.x
@@ -317,7 +317,7 @@ Resources:
   OnPingFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: onping/
+      CodeUri: backend/onping/
       Handler: app.handler
       MemorySize: 256
       Runtime: nodejs20.x
@@ -347,7 +347,7 @@ Resources:
   OnToggleFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: ontoggle/
+      CodeUri: backend/ontoggle/
       Handler: app.handler
       MemorySize: 256
       Runtime: nodejs20.x
@@ -380,7 +380,7 @@ Resources:
   OnDisconnectFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: ondisconnect/
+      CodeUri: backend/ondisconnect/
       Handler: app.handler
       MemorySize: 256
       Runtime: nodejs20.x
@@ -428,7 +428,7 @@ Resources:
   SchedHeartbeatFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: schedhb/
+      CodeUri: backend/schedhb/
       Handler: app.handler
       MemorySize: 256
       Runtime: nodejs20.x

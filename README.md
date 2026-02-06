@@ -42,15 +42,17 @@ The system has three components:
 ```
 .
 ├── README.md
-├── frontend/                   <-- React + TypeScript frontend
+├── backend/
+│   ├── gempost/                <-- HTTP route handler
+│   ├── ondisconnect/           <-- WebSocket disconnect handler
+│   ├── onhello/                <-- WebSocket hello/subscribe handler
+│   ├── onping/                 <-- WebSocket ping handler
+│   ├── ontoggle/               <-- WebSocket toggle handler
+│   └── schedhb/                <-- scheduled heartbeat function
 ├── device/                     <-- Arduino hardware sketches
+├── frontend/                   <-- React + TypeScript frontend
 ├── infra/                      <-- deployment scripts
-├── gempost/                    <-- HTTP route handler
-├── ondisconnect/               <-- WebSocket disconnect handler
-├── onhello/                    <-- WebSocket hello/subscribe handler
-├── onping/                     <-- WebSocket ping handler
-├── ontoggle/                   <-- WebSocket toggle handler
-├── schedhb/                    <-- scheduled heartbeat function
+├── samconfig.toml              <-- SAM CLI environment config
 └── template.yaml               <-- SAM template for Lambda + DynamoDB
 ```
 
