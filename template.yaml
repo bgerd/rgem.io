@@ -3,10 +3,10 @@ AWSTemplateFormatVersion: "2010-09-09"
 # NOTE. Enables SAM shorthand for any AWS::Serverless::* resources
 Transform: AWS::Serverless-2016-10-31
 Description: >
-  rgempad-backend
+  RGEM.io
 
-  SAM Template for rgempad-backend that has the DynamoDB table and Lambda
-  functions needed to demonstrate the Websocket protocol on API Gateway.
+  SAM Template for RGEM.io that has the DynamoDB tables and Lambda
+  functions needed for the HTTP and WebSocket APIs.
 
 # For custom domain names and certificates
 Parameters:
@@ -45,7 +45,7 @@ Resources:
         Type: String
 
   GemStateTable:
-    # Holds the 16-bit gem state for each gemId
+    # Holds the gem state (a 16-element integer array) for each gemId
     # NOTE: By default SAM uses PAY_PER_REQUEST billing (on-demand) and enables SSE with an AWS-managed CMK.
     Type: AWS::Serverless::SimpleTable
     Properties:
@@ -405,7 +405,6 @@ Resources:
   HeartbeatScheduleRule:
     Type: AWS::Events::Rule
     Properties:
-      # Lower heartbeat rate for testing, production should be 9 minutes
       Description: "Trigger heartbeat Lambda every 9 minutes"
       ScheduleExpression: rate(9 minutes)
       State: ENABLED

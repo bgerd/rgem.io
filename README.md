@@ -74,8 +74,10 @@ sam validate --lint
 
 ```bash
 # Must be re-run whenever handlers or template.yaml updated
-sam build && sam package 
+sam build && sam package
 ```
+
+> **Note:** If the structure of `gemState` changes, you must clear the `GEM_STATE_TABLE` in DynamoDB before deploying.
 
 #### 3. Deploy CloudFormation stack from uploaded S3 artifacts
 
@@ -177,20 +179,23 @@ The connection will then be subscribed to  `<gemId>` and it will immediately rec
 
 ```
 > { "type": "hello", "gemId": "<gemId>" }
-< { "type":"update", "gemState": "<base64-48-bytes>" }
+< { "type":"update", "gemState": "<base64-48-bytes>", "ts": "<base64-8-bytes>" }
 ```
-Note: `gemState` is a base64-encoded 48-byte payload representing 16 RGB triplets (16×3 bytes).
+Note: `gemState` is a base64-encoded 48-byte payload representing 16 RGB triplets (16×3 bytes). `ts` is a base64-encoded 8-byte Big-Endian timestamp (milliseconds since epoch) used by clients to discard out-of-order updates.
 
 #### 4.c. To test **toggle** websocket function send the following JSON messages over a connected websocket subscribed to `<gemId>`
 
 ```
-> { "type": "toggle", "idx": 0 }
+> { "type": "toggle", "e": "keydown", "num": 0 }
 ```
+
+- `"num"`: cell index (0–15)
+- `"e"`: event type — `"keydown"` cycles the cell through colors 1–8, `"dblclick"` turns the cell off
 
 All connected websockets subscribed to `<gemId>` should immediately receive the following:
 
 ```
-< { "type":"update", "gemState": "<base64-48-bytes>" }
+< { "type":"update", "gemState": "<base64-48-bytes>", "ts": "<base64-8-bytes>" }
 ```
 
 #### 5. To test the **schedhb** function, all connected websockets subscribed to **ANY** `<gemId>` should receive the following every 9 minutes:
@@ -218,7 +223,7 @@ $ curl -X POST \
 All connected websockets subscribed to `<gemId>` should immediately receive the following:
 
 ```
-< { "type":"update", "gemState": "<base64-48-bytes>" }
+< { "type":"update", "gemState": "<base64-48-bytes>", "ts": "<base64-8-bytes>" }
 ```
 Note: The HTTP response echoes the raw array, while WebSocket clients receive the encoded grid payload.
 
