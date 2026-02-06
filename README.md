@@ -72,35 +72,32 @@ Three environments `dev`, `stage`, `prod` with their own CloudFormation stacks (
 sam validate --lint
 ```
 
-#### 2. Build SAM artifacts locally and upload them to S3
+#### 2. Build and deploy CloudFormation stack
 
 ```bash
 # Must be re-run whenever handlers or template.yaml updated
-sam build && sam package
-```
 
-> **Note:** If the structure of `gemState` changes, you must clear the `GEM_STATE_TABLE` in DynamoDB before deploying.
-
-#### 3. Deploy CloudFormation stack from uploaded S3 artifacts
-
-```bash
 # Deploys rgem-dev
 # websocket endpoint: ws-dev.rgem.io
 # http endpoint: api-dev.rgem.io
-sam deploy --config-env dev
+sam build && sam deploy --config-env dev
 
 # Deploys rgem-stage
 # websocket endpoint: ws-stage.rgem.io
 # http endpoint: api-stage.rgem.io
-sam deploy --config-env stage
+sam build && sam deploy --config-env stage
 
 # Deploys rgem-prod
 # websocket endpoint: ws.rgem.io
 # http endpoint: api.rgem.io
-sam deploy --config-env prod
+sam build && sam deploy --config-env prod
 ```
 
-#### 4. Build, Package, and Deploy React Frontend 
+> **Note:** `sam deploy` with `resolve_s3 = true` (set in `samconfig.toml`) handles packaging automatically. If you set up a CI/CD pipeline where you need to package once and deploy to multiple environments separately, reintroduce `sam package` as a standalone step with an explicit `--s3-bucket` and `--output-template-file`, then deploy the packaged template via `sam deploy --template-file <packaged.yaml> --config-env <env>`.
+
+> **Note:** If the structure of `gemState` changes, you must clear the `GEM_STATE_TABLE` in DynamoDB before deploying.
+
+#### 3. Build, Package, and Deploy React Frontend
 
 ```bash
 # Deploys frontend to app-dev.rgem.io
