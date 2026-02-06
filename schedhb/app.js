@@ -71,7 +71,7 @@ export const handler = async (event) => {
           })
         );
       } else {
-        console.log("Failed to delete from CONNECTIONS_TABLE:", err);
+        console.log("Failed to post to connection:", e);
         throw e;
       }
     }
