@@ -1,27 +1,57 @@
-# rgem-backend
+# RGEM.io
 
-This is the code and template for the `rgem-backend`.
-The project is comprised of:
-- one React frontend
-- deployment scripts
-- one `HTTP` function
-- four `WEBSOCKET` functions
-- a single scheduled event function
-- a `SAM` template that wires them up to a `DynamoDB` table and provides the minimal set of permissions needed to run the app
+A real-time collaborative RGB LED grid. Multiple users can interact with a shared 4x4 (16-cell) light pad simultaneously — through a web browser or a physical hardware keypad — and see each other's changes instantly. Clicking a cell cycles it through 8 colors; double-clicking turns it off.
 
+## Architecture
+
+```
+  Hardware (NeoTrellis)              Frontend (React)
+         |                                |
+         |  HTTP POST                     |  WebSocket
+         v                                v
+       ┌──────────────────────────────────────┐
+       │         AWS Serverless Backend       │
+       │  Lambda  ·  API Gateway  ·  DynamoDB │
+       └──────────────────────────────────────┘
+```
+
+The system has three components:
+
+- **Frontend** (`frontend/`) — React + TypeScript + Vite web app. Connects to the backend over WebSocket, renders the 4x4 grid, and sends click/double-click events.
+- **Backend** (root-level Lambda handlers + `template.yaml`) — AWS SAM stack with WebSocket and HTTP API Gateways, Lambda functions, and two DynamoDB tables (connection tracking and grid state). Broadcasts state updates to all clients subscribed to the same "gem."
+- **Hardware** (`device/`) — Arduino sketch for an Adafruit NeoTrellis M4 (SAMD21). Connects to WiFi, communicates with the backend over WebSocket, and displays the shared grid state on its 4x4 RGB button matrix.
+
+### How It Works
+
+1. A client (web or hardware) connects and sends a `hello` message to subscribe to a named gem.
+2. The backend responds with the current grid state (base64-encoded, 48 bytes = 16 cells x 3 RGB bytes).
+3. When any client clicks a cell, a `toggle` message is sent to the backend.
+4. The backend updates the state in DynamoDB and broadcasts the new state to all subscribers.
+5. Every client renders the updated grid in real time.
+
+### Tech Stack
+
+| Component | Technologies |
+|-----------|-------------|
+| Frontend  | React 19, TypeScript, Vite |
+| Backend   | AWS Lambda (Node.js 20), API Gateway (HTTP + WebSocket), DynamoDB, SAM/CloudFormation |
+| Hardware  | Arduino (SAMD21), Adafruit NeoTrellis, ArduinoJson |
+
+## Project Structure
 
 ```
 .
-├── README.md                   <-- This instructions file
-├── frontend (react-ts)
-├── infra / scripts             <-- deployment scripts
-├── gempost (http route)
-├── ondisconnect (websocket route)
-├── onhello (websocket route)
-├── onping (websocket route)
-├── ontoggle (websocket route)
-├── schedhb (scheduled event)
-└── template.yaml               <-- SAM template for Lambda Functions and DDB
+├── README.md
+├── frontend/                   <-- React + TypeScript frontend
+├── device/                     <-- Arduino hardware sketches
+├── infra/                      <-- deployment scripts
+├── gempost/                    <-- HTTP route handler
+├── ondisconnect/               <-- WebSocket disconnect handler
+├── onhello/                    <-- WebSocket hello/subscribe handler
+├── onping/                     <-- WebSocket ping handler
+├── ontoggle/                   <-- WebSocket toggle handler
+├── schedhb/                    <-- scheduled heartbeat function
+└── template.yaml               <-- SAM template for Lambda + DynamoDB
 ```
 
 # Remote Deployment
