@@ -70,7 +70,7 @@ void onPress(uint8_t key) {
     ASSERT_PRLN(WebSocketConnection::websocket_client.isConnected(), F("ERROR: Invalid CONNECTED state. No websocket connection."));
     ASSERT_PRLN((WiFi.status() == WL_CONNECTED), F("ERROR: Invalid CONNECTED state. No wifi connection"));
 
-    // Build json json_doc to emit toogle to rgempad-backend
+    // Build json_doc to emit toggle to rgempad-backend
     json_doc.clear();
     json_doc[F("type")] = F("toggle");
     json_doc[F("e")] = F("keydown");
@@ -112,7 +112,7 @@ void onDoubleClick(uint8_t key) {
     ASSERT_PRLN(WebSocketConnection::websocket_client.isConnected(), F("ERROR: Invalid CONNECTED state. No websocket connection."));
     ASSERT_PRLN((WiFi.status() == WL_CONNECTED), F("ERROR: Invalid CONNECTED state. No wifi connection"));
 
-    // Build json json_doc to emit toogle to rgempad-backend
+    // Build json_doc to emit toggle to rgempad-backend
     json_doc.clear();
     json_doc[F("type")] = F("toggle");
     json_doc[F("e")] = F("dblclick");

@@ -44,7 +44,7 @@ namespace Networking {
       ERROR_PRLN(F("ERROR: Could not get winc1500 firmware version"));
     }
 
-    // Snz. Look into setting winc1500 client name as evident in ssid's DHCP client list
+    // TODO: Look into setting winc1500 client name as evident in ssid's DHCP client list
     INFO_PRINT(F("winc1500 firmware version: "));
     INFO_PRLN(Networking::firmware_version);
 

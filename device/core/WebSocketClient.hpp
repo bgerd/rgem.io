@@ -59,7 +59,7 @@ namespace WebSocketConnection {
 
       case WStype_PING:
         // pong will be send automatically
-        INFO_PRLN("[WSc] get ping");
+        INFO_PRLN(F("[WSc] get ping"));
         break;
 
       case WStype_PONG:

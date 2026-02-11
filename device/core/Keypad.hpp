@@ -9,7 +9,7 @@ namespace Keypad {
   
   // Framebuffer for gem state and dirty flag
   uint32_t gem_state[16];
-  boolean needs_update = false;
+  bool needs_update = false;
   
   unsigned long loop_timer = 0;
 
@@ -124,7 +124,7 @@ namespace Keypad {
     loop();
   }
 
-  size_t PATTERN_SEEK_LEN = 8;
+  const size_t PATTERN_SEEK_LEN = 8;
   const uint16_t PATTERN_SEEK [] = {
     576, 12684, 4104, 0,
     1056, 51219, 32769, 0
