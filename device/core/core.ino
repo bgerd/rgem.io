@@ -60,35 +60,41 @@ const uint16_t CORNER_KEYS_MASK = (1<<0)|(1<<3)|(1<<12)|(1<<15);
 const uint32_t CORNER_HOLD_MS = 5000;  // 5 seconds
 uint16_t keys_pressed = 0x00;
 
+// Send a toggle message to the backend over the websocket connection.
+// NOTE: using const __FlashStringHelper* as the parameter type means the caller must pass an F() string
+// The F() macro avoids storing strings in RAM. It keeps strings in flash (program memory) and returns
+// a const __FlashStringHelper* pointer to it there
+void sendToggle(uint8_t key, const __FlashStringHelper* eventType) {
+
+  // NOTE: Guarded by state machine — only sends when fully connected.
+  if (next_state != WSOCKET_CONNECTED || last_state != WSOCKET_CONNECTED) return;
+
+  ASSERT_PRLN(WebSocketConnection::websocket_client.isConnected(), F("ERROR: Invalid CONNECTED state. No websocket connection."));
+  ASSERT_PRLN((WiFi.status() == WL_CONNECTED), F("ERROR: Invalid CONNECTED state. No wifi connection"));
+
+  json_doc.clear();
+  json_doc[F("type")] = F("toggle");
+  json_doc[F("e")] = eventType;
+  json_doc[F("num")] = key;
+
+  // NOTE: Max serialized size is 41 bytes: {"type":"toggle","e":"dblclick","num":XX}
+  String msg;
+  msg.reserve(45);
+  // NOTE: Tried and failed to wrap WebSocketClient in ArduinoJson Custom Writer
+  // per: https://arduinojson.org/v7/api/json/serializejson/#custom-writer
+  serializeJson(json_doc, msg);
+
+  INFO_PRINT(F("[WSc TX] Sending: "));
+  INFO_PRLN(msg);
+  WebSocketConnection::websocket_client.sendTXT(msg);
+}
+
 void onPress(uint8_t key) {
   INFO_PRINT(F("[Keypad] key_pressed: "));
   INFO_PRLN(key);
   keys_pressed = keys_pressed | (1 << key);
 
-  if (next_state == WSOCKET_CONNECTED && last_state == WSOCKET_CONNECTED) {
-
-    ASSERT_PRLN(WebSocketConnection::websocket_client.isConnected(), F("ERROR: Invalid CONNECTED state. No websocket connection."));
-    ASSERT_PRLN((WiFi.status() == WL_CONNECTED), F("ERROR: Invalid CONNECTED state. No wifi connection"));
-
-    // Build json_doc to emit toggle to rgempad-backend
-    json_doc.clear();
-    json_doc[F("type")] = F("toggle");
-    json_doc[F("e")] = F("keydown");
-    json_doc[F("num")] = key;
-    
-    // NOTE: Calculated 40 bytes to {"type":"toggle","e":"keydown","num":XX}
-    String msg;
-    msg.reserve(45);
-
-    // NOTE: Tried and failed to wrap WebSocketClient in AduinoJson Custom Writer
-    // per: https://arduinojson.org/v7/api/json/serializejson/#custom-writer
-    serializeJson(json_doc, msg);
-
-    INFO_PRINT(F("[WSc TX] Sending: "));
-    INFO_PRLN(msg);
-    WebSocketConnection::websocket_client.sendTXT(msg);
-  }
-
+  sendToggle(key, F("keydown"));
 }
 
 void onRelease(uint8_t key) {
@@ -107,29 +113,7 @@ void onDoubleClick(uint8_t key) {
   INFO_PRINT(F("[Keypad] key_double_clicked: "));
   INFO_PRLN(key);
 
-  if (next_state == WSOCKET_CONNECTED && last_state == WSOCKET_CONNECTED) {
-
-    ASSERT_PRLN(WebSocketConnection::websocket_client.isConnected(), F("ERROR: Invalid CONNECTED state. No websocket connection."));
-    ASSERT_PRLN((WiFi.status() == WL_CONNECTED), F("ERROR: Invalid CONNECTED state. No wifi connection"));
-
-    // Build json_doc to emit toggle to rgempad-backend
-    json_doc.clear();
-    json_doc[F("type")] = F("toggle");
-    json_doc[F("e")] = F("dblclick");
-    json_doc[F("num")] = key;
-    
-    // NOTE: Calculated 41 bytes to {"type":"toggle","e":"dblclick","num":XX}
-    String msg;
-    msg.reserve(45);
-
-    // NOTE: Tried and failed to wrap WebSocketClient in AduinoJson Custom Writer
-    // per: https://arduinojson.org/v7/api/json/serializejson/#custom-writer
-    serializeJson(json_doc, msg);
-
-    INFO_PRINT(F("[WSc TX] Sending: "));
-    INFO_PRLN(msg);
-    WebSocketConnection::websocket_client.sendTXT(msg);
-  }
+  sendToggle(key, F("dblclick"));
 }
 
 // bool isResetButtonHold(std::function<void()> doResetCallback) {
