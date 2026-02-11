@@ -33,10 +33,22 @@ Conditions:
 
 Resources:
 
+# Shared Layer ######
+  CommonLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: !Sub "${AWS::StackName}-common-layer"
+      ContentUri: backend/layers/common/
+      CompatibleRuntimes:
+        - nodejs20.x
+      RetentionPolicy: Delete
+
 # State ######
   ConnectionsTable:
     # Holds the connection identifiers to set identifiers for each connected client
     # NOTE: By default SAM uses PAY_PER_REQUEST billing (on-demand) and enables SSE with an AWS-managed CMK.
+    # TODO: Replace DynamoDB with a more suitable database for CONNECTIONS_TABLE such as Redis or ElastiCache for lower latency and higher throughput. 
+    # TODO: Add TTL attribute to CONNECTIONS_TABLE to automatically delete stale connections.
     Type: AWS::Serverless::SimpleTable
     Properties:
       TableName: !Sub "${AWS::StackName}-connections-table"
@@ -47,6 +59,7 @@ Resources:
   GemStateTable:
     # Holds the gem state (a 16-element integer array) for each gemId
     # NOTE: By default SAM uses PAY_PER_REQUEST billing (on-demand) and enables SSE with an AWS-managed CMK.
+    # TODO: Replace DynamoDB with a more suitable database for GEM_STATE_TABLE such as Redis or ElastiCache for lower latency and higher throughput. 
     Type: AWS::Serverless::SimpleTable
     Properties:
       TableName: !Sub "${AWS::StackName}-gem-state-table"
@@ -121,6 +134,8 @@ Resources:
       Handler: app.handler
       MemorySize: 256
       Runtime: nodejs20.x
+      Layers:
+        - !Ref CommonLayer
       Environment:
         Variables:
           # Note: WS_API_ENDPOINT is a reference to the WebSocket API endpoint for functions external to the RGempadWSApi gateway
@@ -288,6 +303,8 @@ Resources:
       Handler: app.handler
       MemorySize: 256
       Runtime: nodejs20.x
+      Layers:
+        - !Ref CommonLayer
       Environment:
         Variables:
           CONNECTIONS_TABLE: !Ref ConnectionsTable        
@@ -321,6 +338,8 @@ Resources:
       Handler: app.handler
       MemorySize: 256
       Runtime: nodejs20.x
+      Layers:
+        - !Ref CommonLayer
       Environment:
         Variables:
           CONNECTIONS_TABLE: !Ref ConnectionsTable
@@ -351,6 +370,8 @@ Resources:
       Handler: app.handler
       MemorySize: 256
       Runtime: nodejs20.x
+      Layers:
+        - !Ref CommonLayer
       Environment:
         Variables:
           CONNECTIONS_TABLE: !Ref ConnectionsTable        
@@ -384,6 +405,8 @@ Resources:
       Handler: app.handler
       MemorySize: 256
       Runtime: nodejs20.x
+      Layers:
+        - !Ref CommonLayer
       Environment:
         Variables:
           CONNECTIONS_TABLE: !Ref ConnectionsTable
@@ -432,6 +455,8 @@ Resources:
       Handler: app.handler
       MemorySize: 256
       Runtime: nodejs20.x
+      Layers:
+        - !Ref CommonLayer
       Environment:
         Variables:
           # Note this is a reference to the WebSocket API endpoint for functions external to that gateway

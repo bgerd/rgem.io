@@ -1,6 +1,6 @@
 /**
  * AWS Lambda handler for processing POST requests to /gem/{gemId}.
- * 
+ *
  * This function performs the following tasks:
  * 1. Extracts the `gemId` from the path parameters.
  * 2. Parses the request body to retrieve the new `gemState`.
@@ -10,72 +10,30 @@
  * 6. Scans the `CONNECTIONS_TABLE` to find all connected WebSocket clients associated with the `gemId`.
  * 7. Broadcasts the updated `gemState` to all connected WebSocket clients.
  * 8. Handles stale WebSocket connections by removing them from the `CONNECTIONS_TABLE`.
- * 
+ *
  * @param {Object} event - The Lambda event object.
  * @param {Object} event.pathParameters - The path parameters from the API Gateway request.
  * @param {string} event.pathParameters.gemId - The ID of the gem being updated.
  * @param {string} event.body - The JSON string representing the new gem state.
- * 
+ *
  * @returns {Promise<Object>} - The HTTP response object.
  * @property {number} statusCode - The HTTP status code of the response.
  * @property {string} body - The JSON stringified response body containing the `gemId` and echoed `gemState`.
- * 
- * @throws {Error} - Returns a 400 status code for missing or invalid input, 
+ *
+ * @throws {Error} - Returns a 400 status code for missing or invalid input,
  *                   and a 500 status code for internal server errors.
  */
 // gempost/app.js
 
-import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import {
-  DynamoDBDocumentClient,
-  PutCommand,
-  ScanCommand,
-  // GetCommand,
-  DeleteCommand,
-} from "@aws-sdk/lib-dynamodb";
-import {
-  ApiGatewayManagementApiClient,
-  PostToConnectionCommand,
-} from "@aws-sdk/client-apigatewaymanagementapi";
+import { PutCommand } from "@aws-sdk/lib-dynamodb";
+import { ddbDocClient } from "/opt/nodejs/ddb.js";
+import { createWsClient } from "/opt/nodejs/ws-client.js";
+import { broadcastToGem } from "/opt/nodejs/ws-broadcast.js";
+import { GEM_STATE_LENGTH, GEM_APP_TOGGLE_RANGE, buildUpdateMessage } from "/opt/nodejs/gem-state.js";
 
-const { CONNECTIONS_TABLE, GEM_STATE_TABLE, WS_API_ENDPOINT, AWS_REGION } = process.env;
+const { CONNECTIONS_TABLE, GEM_STATE_TABLE, WS_API_ENDPOINT } = process.env;
 
-const ddbClient = new DynamoDBClient({ region: AWS_REGION });
-const ddbDocClient = DynamoDBDocumentClient.from(ddbClient);
-const websocketApiGateway = new ApiGatewayManagementApiClient({
-  endpoint: WS_API_ENDPOINT,
-});
-
-// TODO: Create shared libraries for managing gemState, etc. 
-function keyColorCss(n, max) {
-  const wheelPos = n * 255 / max; 
-  let r = 0, g = 0, b = 0;
-
-  if (wheelPos < 85) {
-    r = wheelPos * 3;
-    g = 255 - wheelPos * 3;
-    b = 0;
-  } else if (wheelPos < 170) {
-    const wp = wheelPos - 85;
-    r = 255 - wp * 3;
-    g = 0;
-    b = wp * 3;
-  } else {
-    const wp = wheelPos - 170;
-    r = 0;
-    g = wp * 3;
-    b = 255 - wp * 3;
-  }
-  return [Math.round(r), Math.round(g), Math.round(b)];
-}
-
-// The gemState is represented as an array of 16 integers,
-// where each integer represents the state of a "gem"
-const GEM_STATE_LENGTH = 16;
-
-// The range of gemState values that map to the color wheel
-// (e.g. 8 means values 1-8 map to the color wheel, and 0 is off)
-const GEM_APP_TOGGLE_RANGE = 8; 
+const websocketApiGateway = createWsClient({ endpoint: WS_API_ENDPOINT });
 
 /* TEST ECHO with curl:
   curl -X POST \
@@ -172,36 +130,14 @@ export const handler = async (event) => {
     echo: parsedBody,
   };
 
-  // // First, get the current gemState for the gemId
-  // let gemState;
-  // try {
-  //   const getResult = await ddbDocClient.send(
-  //     new GetCommand({
-  //       TableName: GEM_STATE_TABLE,
-  //       Key: { gemId: gemId },
-  //     })
-  //   );
-  //   gemState = getResult.Item.gemState;
-  // } catch (err) {
-  //   console.log("Failed to get current gemState from GEM_STATE_TABLE:", err);
-  //   return {
-  //     statusCode: 500,
-  //     body:
-  //       "Failed to get current gemState from GEM_STATE_TABLE: " +
-  //       JSON.stringify(err),
-  //   };
-  // }  
   // Upsert the gemState in the GEM_STATE_TABLE
   // Use the clamped parsed body as the new gemState
-  let gemState = clamped; 
+  let gemState = clamped;
   try {
     await ddbDocClient.send(
       new PutCommand({
         TableName: GEM_STATE_TABLE,
-        Item: {
-          gemId: gemId,
-          gemState: gemState,
-        },
+        Item: { gemId, gemState },
       })
     );
   } catch (err) {
@@ -212,91 +148,11 @@ export const handler = async (event) => {
     };
   }
 
-  // TODO: Reimplement JSON-based messaging protocol as a more efficient binary protocol (encoded as base64 for API Gateway transport) to reduce message size and parsing overhead on the client.
-  // Build the update JSON message to send to all connected clients
-
-  // Iterate through gemState and create a coresponding 24-bit RGB array
-  const gemStateRGBArray = [];
-  for (let i = 0; i < GEM_STATE_LENGTH; i++) {
-    if (gemState[i] == 0) {
-      // If the gemState is Off, push [0, 0, 0] to gemStateRGBArray
-      gemStateRGBArray.push([0, 0, 0]);
-      continue;
-    }
-    gemStateRGBArray.push(keyColorCss(gemState[i]-1, GEM_APP_TOGGLE_RANGE));
-  } 
-
-  // Convert gemStateRGBArray to a binary gemStateBuf of length 16*3 = 48 bytes
-  const gemStateBuf = new Uint8Array(GEM_STATE_LENGTH * 3);
-  for (let i = 0; i < GEM_STATE_LENGTH; i++) {
-    gemStateBuf.set(gemStateRGBArray[i], i * 3);
-  }
-
-  // Convert currentTimeMillis to a binary buffer of length 8 bytes (Big Endian)
-  // Note: 40% less data to transmit and skip string parsing on clients compared to sending as ISO string
-  const currentTimeMillisBuf = Buffer.alloc(8);
-  currentTimeMillisBuf.writeBigUInt64BE(BigInt(currentTimeMillis));
-
-  const updateMsg = {
-    type: "update",
-    gemState: Buffer.from(gemStateBuf).toString('base64'),
-    ts: Buffer.from(currentTimeMillisBuf).toString('base64'),
-  };
-  const updateMsgStr = JSON.stringify(updateMsg);
-
-  // Scan CONNECTIONS_TABLE to find all connected clients associated with this client's gemId
-  let connectedClients;
-  try {
-    connectedClients = await ddbDocClient.send(
-      new ScanCommand({
-        TableName: CONNECTIONS_TABLE,
-        FilterExpression: "gemId = :gemId",
-        ExpressionAttributeValues: {
-          ":gemId": gemId,
-        },
-        ProjectionExpression: "connectionId",
-        // // Default false. A read may briefly return stale data for up to ~1 second after a write. 
-        // // Setting to true to ensure we get the latest data. It costs 2x read capacity units.
-        // ConsistentRead: true,
-      })
-    );
-  } catch (err) {
-    console.log("Failed to scan CONNECTIONS_TABLE:", err);
-    return {
-      statusCode: 500,
-      body: "Failed to scan CONNECTIONS_TABLE: " + JSON.stringify(err),
-    };
-  }
-
-  // Broadcast the updated gemState to all connected clients
-  const postCalls = connectedClients.Items.map(async ({ connectionId }) => {
-    try {
-      const postCmd = new PostToConnectionCommand({
-        ConnectionId: connectionId,
-        Data: updateMsgStr,
-      });
-      await websocketApiGateway.send(postCmd);
-    } catch (err) {
-      // If the connection is stale (e.g., the client has disconnected), we delete it from the DynamoDB table
-      if (err.statusCode === 410) {
-        console.log(`Found stale connection, deleting ${connectionId}`);
-        await ddbDocClient.send(
-          new DeleteCommand({
-            TableName: CONNECTIONS_TABLE,
-            Key: {
-              connectionId: connectionId,
-            },
-          })
-        );
-      } else {
-        console.log("Failed to delete from CONNECTIONS_TABLE:", err);
-        throw err;
-      }
-    }
-  });
+  // Build and broadcast the update message to all connected clients for this gemId
+  const updateMsgStr = buildUpdateMessage(gemState, currentTimeMillis);
 
   try {
-    await Promise.all(postCalls);
+    await broadcastToGem(websocketApiGateway, gemId, updateMsgStr, CONNECTIONS_TABLE);
   } catch (err) {
     return { statusCode: 500, body: err.stack };
   }
@@ -304,6 +160,6 @@ export const handler = async (event) => {
   // Return the parsed body as the response
   return {
     statusCode: 200,
-    body: JSON.stringify(responseBody), // Re-stringifying for consistency
+    body: JSON.stringify(responseBody),
   };
 };

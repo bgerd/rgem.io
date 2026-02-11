@@ -18,7 +18,7 @@ A real-time collaborative RGB LED grid. Multiple users can interact with a share
 The system has three components:
 
 - **Frontend** (`frontend/`) — React + TypeScript + Vite web app. Connects to the backend over WebSocket, renders the 4x4 grid, and sends click/double-click events.
-- **Backend** (root-level Lambda handlers + `template.yaml`) — AWS SAM stack with WebSocket and HTTP API Gateways, Lambda functions, and two DynamoDB tables (connection tracking and grid state). Broadcasts state updates to all clients subscribed to the same "gem."
+- **Backend** (`backend/` + `template.yaml`) — AWS SAM stack with WebSocket and HTTP API Gateways, Lambda functions (Node.js 20, ES modules), a shared Lambda layer, and two DynamoDB tables (connection tracking and grid state). Broadcasts state updates to all clients subscribed to the same "gem."
 - **Hardware** (`device/`) — Arduino sketch for an Adafruit NeoTrellis M4 (SAMD21). Connects to WiFi, communicates with the backend over WebSocket, and displays the shared grid state on its 4x4 RGB button matrix.
 
 ### How It Works
@@ -48,7 +48,9 @@ The system has three components:
 │   ├── onhello/                <-- WebSocket hello/subscribe handler
 │   ├── onping/                 <-- WebSocket ping handler
 │   ├── ontoggle/               <-- WebSocket toggle handler
-│   └── schedhb/                <-- scheduled heartbeat function
+│   ├── schedhb/                <-- scheduled heartbeat function
+│   ├── layers/common/nodejs/   <-- shared Lambda layer (DDB, WS, gem-state utils)
+│   └── update-dependencies.sh  <-- updates node_modules across handlers
 ├── device/                     <-- Arduino hardware sketches
 ├── frontend/                   <-- React + TypeScript frontend
 ├── infra/                      <-- deployment scripts

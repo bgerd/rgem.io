@@ -1,0 +1,6 @@
+{
+  "name": "rgem-common-layer",
+  "version": "1.0.0",
+  "description": "Shared utilities for RGEM Lambda handlers",
+  "type": "module"
+}

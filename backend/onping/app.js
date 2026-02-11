@@ -1,33 +1,20 @@
-import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import {
-  DynamoDBDocumentClient,
-  DeleteCommand,
-} from "@aws-sdk/lib-dynamodb";
-import {
-  ApiGatewayManagementApiClient,
-  PostToConnectionCommand,
-} from "@aws-sdk/client-apigatewaymanagementapi";
+import { ddbDocClient } from "/opt/nodejs/ddb.js";
+import { createWsClient, PostToConnectionCommand } from "/opt/nodejs/ws-client.js";
+import { DeleteCommand } from "@aws-sdk/lib-dynamodb";
 
-const { CONNECTIONS_TABLE, AWS_REGION } = process.env;
-
-const ddbClient = new DynamoDBClient({ region: AWS_REGION });
-const ddbDocClient = DynamoDBDocumentClient.from(ddbClient);
+const { CONNECTIONS_TABLE } = process.env;
 
 export const handler = async (event) => {
-  // Keep this handler ultra-lightweight: no DynamoDB, no scans, no side effects.
+  // Keep this handler ultra-lightweight: no DynamoDB scans, no side effects.
   const connectionId = event.requestContext.connectionId;
 
-  const apiGateway = new ApiGatewayManagementApiClient({
-    endpoint: `https://${event.requestContext.apiId}.execute-api.${AWS_REGION}.amazonaws.com/${event.requestContext.stage}`,
-  }); // same pattern as hello :contentReference[oaicite:2]{index=2}
-
+  const apiGateway = createWsClient({ requestContext: event.requestContext });
+  // Note: Ping/Pong is only sent/expected by Frontend clients and not Hardware clients.
   try {
     await apiGateway.send(
       new PostToConnectionCommand({
         ConnectionId: connectionId,
-        Data: JSON.stringify({
-          type: "pong",
-        }),
+        Data: JSON.stringify({ type: "pong" }),
       })
     );
   } catch (err) {
@@ -37,13 +24,11 @@ export const handler = async (event) => {
       await ddbDocClient.send(
         new DeleteCommand({
           TableName: CONNECTIONS_TABLE,
-          Key: {
-            connectionId: connectionId,
-          },
+          Key: { connectionId },
         })
       );
     } else {
-      console.log("Failed to delete from CONNECTIONS_TABLE:", err);
+      console.log("Failed to post to connection:", err);
       throw err;
     }
   }

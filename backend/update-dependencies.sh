@@ -1,6 +1,7 @@
-cd onhello && ncu -u && npm install && cd ..
-cd onping && ncu -u && npm install && cd ..
-cd ontoggle && ncu -u && npm install && cd ..
-cd schedhb && ncu -u && npm install && cd ..
-cd ondisconnect && ncu -u && npm install && cd ..
-cd gempost && ncu -u && npm install && cd ..
+# Handler and layer package.json files currently have no npm dependencies
+# (AWS SDK v3 ships with the Node.js 20.x Lambda runtime).
+# If dependencies are added in the future, update them here:
+#
+# for dir in onhello onping ontoggle schedhb ondisconnect gempost layers/common/nodejs; do
+#   cd "$dir" && ncu -u && npm install && cd -
+# done
