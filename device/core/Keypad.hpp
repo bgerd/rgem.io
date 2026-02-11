@@ -215,6 +215,7 @@ static void handleReleaseAsBrowserClick(uint8_t key) {
     const uint32_t dt = now - firstClickMs[key];
     if (dt <= DBLCLICK_MS) {
       // Success: this is a browser-like dblclick AFTER two clicks.
+      waitingSecond[key] = false;
       onDoubleClick(key);
 
     } else {

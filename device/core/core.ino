@@ -35,7 +35,7 @@ JsonDocument json_doc;
 #include <base64.hpp>
 
 // Track latest update timestamp from server
-u_int64_t latestUpdateTs = 0;
+uint64_t latestUpdateTs = 0;
 
 ///////////////////////////////
 // Configure flash storage with samd-specific API
@@ -138,7 +138,7 @@ bool isResetButtonHold() {
   // Detect Corner Hold
   if((keys_pressed & CORNER_KEYS_MASK) == CORNER_KEYS_MASK) {
 
-    long cornerHoldStart = 0;
+    unsigned long cornerHoldStart = 0;
     INFO_PRLN(F("[Keypad] corner_hold_detected"));
     do {
       if(0 == cornerHoldStart) {
@@ -560,7 +560,7 @@ void do_wsocket_connected() {
   }  
 
   // Detect configuration change
-  if (!memcmp(cred_stored.gemID, HttpConfigServer::gemID, sizeof(cred_stored.gemID)) == 0) {
+  if (memcmp(cred_stored.gemID, HttpConfigServer::gemID, sizeof(cred_stored.gemID)) != 0) {
     INFO_PRLN(F("Credentials changed. Updating stored credentials and refreshing rgem connection."));
     strncpy(cred_stored.gemID, HttpConfigServer::gemID, sizeof(cred_stored.gemID)-1);
     gem_credentials.write(cred_stored);

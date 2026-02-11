@@ -46,7 +46,9 @@ namespace WebSocketConnection {
           INFO_PRINT(F("[WSc] get text: "));
           INFO_PRLN((char *) payload);
           
-          do_receive_msg_callback((char *)payload);
+          if (do_receive_msg_callback) {
+            do_receive_msg_callback((char *)payload);
+          }
         } 
         break;
 
