@@ -19,7 +19,7 @@ namespace Networking {
   uint8_t macAddress[6];
   char macAddrString[13]; // 12 hex chars + null
 
-  // Td. Review and clean-up all using of String objects for concatenation ...
+  // TODO: Review and clean-up all using of String objects for concatenation ...
   String device_id;
   const char* device_model = RGEMPAD_CORE_MODEL;
   char* firmware_version;
@@ -59,7 +59,7 @@ namespace Networking {
     INFO_PRLN(macAddrString);
 
     // Init device ID
-    // Td. Review and clean-up all using of String objects for concatenation ...
+    // TODO: Review and clean-up all using of String objects for concatenation ...
     char suffix[8];  // '-' + 6 hex chars + null
     snprintf(suffix, sizeof(suffix), "-%02x%02x%02x",
             macAddress[2], macAddress[1], macAddress[0]);
@@ -78,7 +78,7 @@ namespace Networking {
       // Register webserver service
       mdns.addServiceRecord((device_id + " Webserver._http").c_str(), 80, MDNSServiceTCP);
 
-      // Snz. Look into registering service records (e.g. TXT records) for discovery
+      // TODO: Look into registering service records (e.g. TXT records) for discovery
       // see: https://github.com/arduino-libraries/ArduinoMDNS/blob/master/examples/WiFi/WiFiRegisteringServicesWithTxtRecord/WiFiRegisteringServicesWithTxtRecord.ino
       return true;
     }

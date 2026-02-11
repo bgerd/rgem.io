@@ -214,7 +214,7 @@ Resources:
       # Note: that the route key is "hello" which means that the API Gateway will look for a "type" field in the JSON body
       # of the request with the value "hello" to invoke this route, per the RouteSelectionExpression.
       # WARNING: Changing the RouteKey will require forcing a new deployment.
-      # Td. Learn how to force a new deployment without having to delete the stack
+      # TODO: Learn how to force a new deployment without having to delete the stack
       RouteKey: hello
       AuthorizationType: NONE
       OperationName: HelloRoute

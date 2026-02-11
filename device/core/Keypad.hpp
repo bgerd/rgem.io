@@ -92,7 +92,7 @@ namespace Keypad {
     update(0x0000);
   }
 
-  // Note that this is a blocking animation that
+  // NOTE: This is a blocking animation that
   // also clears the gem_state framebuffer 
   void showCascade() {
     for (uint16_t i=0; i<num_pixels; i++) {

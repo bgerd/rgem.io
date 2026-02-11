@@ -58,8 +58,24 @@ Compile and upload via Arduino IDE.
 
 ### Arduino (C++)
 - UPPER_CASE constants, camelCase functions
-- Inline `Td.` markers for TODOs
+- Legacy `Td.` markers exist — migrate to `TODO:` when touching those files
 - Enum-based state machine: BOOT -> PROVISIONING -> WIFI_DISCONNECTED -> WIFI_CONNECTED -> WSOCKET_CONNECTED
+
+## Comment & Annotation Conventions
+
+### Standard Markers
+- `TODO:` — Work to be done. Be specific about what and why.
+- `NOTE:` — Lessons learned, gotchas, non-obvious behavior, architectural decisions. Especially important for bug fixes and design trade-offs.
+- `HACK:` — Intentional workaround. Explain the constraint being worked around.
+- `FIXME:` — Known broken behavior that needs fixing.
+
+### When Editing Code
+- **Preserve existing comments** — Never silently remove a TODO, NOTE, HACK, or FIXME unless the change makes it provably obsolete
+- **Flag inconsistencies** — When touching code with non-standard markers (e.g., `Td.`, `Note.`), normalize them to the standard format above
+- **Annotate bug fixes** — Add a `NOTE:` explaining what was wrong and why, not just what changed
+- **Annotate design decisions** — Add a `NOTE:` explaining the trade-off or rationale for architectural choices
+- **Annotate refactors** — Add a `NOTE:` explaining the motivation and any behavioral changes
+- **Resolve TODOs** — If a change addresses a TODO, remove it. If partial, update the text.
 
 ## Key Gotchas
 

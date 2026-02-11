@@ -58,10 +58,10 @@ namespace HttpConfigServer {
   
   void handlePostConfig(Request &req, Response &res) {
 
-    // Td. Look into why we cannot pass in F() PROGMEM strings
+    // TODO: Look into why we cannot pass in F() PROGMEM strings
     res.set("Content-Type", "text/html");
 
-    // Note that our longest form key is "gemID" with 5 characters
+    // NOTE: Our longest form key is "gemID" with 5 characters
     char key[10];
     char value[64];
 

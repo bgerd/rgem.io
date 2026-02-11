@@ -15,10 +15,10 @@
 
 #warning SSL Certificates for WEBSOCKET_HOST MUST be pre-loaded onto winc1500 firmware
 // TODO: Parameterize WEBSOCKET_HOST with build system
-#define WEBSOCKET_HOST "ws-dev.rgem.io"
+#define WEBSOCKET_HOST "ws.rgem.io"
 #define WEBSOCKET_PORT 443
 #define WEBSOCKET_URL "/"
-// Note that WebSocketsClient_Generic effectively blocks when trying to connect
+// NOTE: WebSocketsClient_Generic effectively blocks when trying to connect
 // WEBSOCKET_RECONNECT_INTERVAL_MS consequently determines duration of WAIT_FOR_WEBSOCKET 
 // animations sequence.  Lib default is 0.5s (500), should be greater than 5s (5000)
 const unsigned long WEBSOCKET_RECONNECT_INTERVAL_MS = 10000; 
@@ -74,8 +74,8 @@ namespace WebSocketConnection {
 
     do_receive_msg_callback = doReceiveMsgCallback;
 
-    // Note. Connecting and reconnecting a websocket client is effectively 
-    //       an async blocking operation ... 
+    // NOTE: Connecting and reconnecting a websocket client is effectively
+    //       an async blocking operation ...
     websocket_client.setReconnectInterval(WEBSOCKET_RECONNECT_INTERVAL_MS);
 
     // Configure heartbeat

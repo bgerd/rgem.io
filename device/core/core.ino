@@ -1,4 +1,4 @@
-// Td. Fix VS Code Include Paths 
+// TODO: Fix VS Code Include Paths
 
 #define RGEMPAD_CORE_VERSION "core2.0"
 #define RGEMPAD_CORE_MODEL "rgempad"
@@ -39,7 +39,7 @@ u_int64_t latestUpdateTs = 0;
 
 ///////////////////////////////
 // Configure flash storage with samd-specific API
-// Td. Reimplement with generic EEPROM API 
+// TODO: Reimplement with generic EEPROM API
 // Assert NULL initial values
 struct GemCredentials {
   char gemID[32];  
@@ -76,11 +76,11 @@ void onPress(uint8_t key) {
     json_doc[F("e")] = F("keydown");
     json_doc[F("num")] = key;
     
-    // Note. Calculated 40 bytes to {"type":"toggle","e":"keydown","num":XX}
+    // NOTE: Calculated 40 bytes to {"type":"toggle","e":"keydown","num":XX}
     String msg;
     msg.reserve(45);
 
-    // Note. Tried and failed to wrap WebSocketClient in AduinoJson Custom Writer
+    // NOTE: Tried and failed to wrap WebSocketClient in AduinoJson Custom Writer
     // per: https://arduinojson.org/v7/api/json/serializejson/#custom-writer
     serializeJson(json_doc, msg);
 
@@ -88,7 +88,7 @@ void onPress(uint8_t key) {
     INFO_PRLN(msg);
     WebSocketConnection::websocket_client.sendTXT(msg);
   }
-  
+
 }
 
 void onRelease(uint8_t key) {
@@ -118,18 +118,18 @@ void onDoubleClick(uint8_t key) {
     json_doc[F("e")] = F("dblclick");
     json_doc[F("num")] = key;
     
-    // Note. Calculated 41 bytes to {"type":"toggle","e":"dblclick","num":XX}
+    // NOTE: Calculated 41 bytes to {"type":"toggle","e":"dblclick","num":XX}
     String msg;
     msg.reserve(45);
 
-    // Note. Tried and failed to wrap WebSocketClient in AduinoJson Custom Writer
+    // NOTE: Tried and failed to wrap WebSocketClient in AduinoJson Custom Writer
     // per: https://arduinojson.org/v7/api/json/serializejson/#custom-writer
     serializeJson(json_doc, msg);
 
     INFO_PRINT(F("[WSc TX] Sending: "));
     INFO_PRLN(msg);
     WebSocketConnection::websocket_client.sendTXT(msg);
-  }  
+  }
 }
 
 // bool isResetButtonHold(std::function<void()> doResetCallback) {
@@ -181,7 +181,7 @@ void setup() {
 
   WebSocketConnection::init([](const char* payload ) -> void {
     // Implements ReceiveMsgCallback
-    // Note. This is a non-capturing lambda that will convert to a function pointer
+    // NOTE: This is a non-capturing lambda that will convert to a function pointer
     json_doc.clear();
     if (next_state == WSOCKET_CONNECTED && last_state == WSOCKET_CONNECTED) {
 
@@ -311,7 +311,7 @@ void loop() {
 void init_provisioning() {
   INFO_PRLN(F("\nSTATE: PROVISIONING"));
 
-  // Note important WINC1500 workaround!
+  // NOTE: Important WINC1500 workaround!
   // (1) WiFi101_Generic MUST be patched to make startProvision() a public function
   // (2) The HttpConfigServerDomainName must be set to "192.168.1.1"
   // Because the winc1500's http server is strict about the http req "host:" header value
@@ -325,7 +325,7 @@ void init_provisioning() {
 
 void do_provisioning() {
 
-  // Note that WiFi.status() internally calls winc1500 event loop
+  // NOTE: WiFi.status() internally calls winc1500 event loop
   switch(WiFi.status()){
     case WL_CONNECTED:
       INFO_PRLN(F("Provisioning Success. Connected to WiFi."));
@@ -437,7 +437,6 @@ void init_wifi_connected() {
   WebSocketConnection::websocket_client.beginSSL(WEBSOCKET_HOST, WEBSOCKET_PORT, WEBSOCKET_URL);
 }
 
-// Note that 
 void do_wifi_connected() {
 
   // Check if WIFI disconnected 
