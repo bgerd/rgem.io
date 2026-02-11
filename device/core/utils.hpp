@@ -1,26 +1,3 @@
-/*
-Give me a non-blocking function with the following decleration:
-
-  void ledLoopPattern(uint8_t ledPin, const long*pattern, size_t len)
-
-Given a pattern array of time delays, it loops through the array and alternate between turning
-the specified ledPin ON and OFF (e.g. digitalWrite(ledPin, HIGH) and digitalWrite(ledPin, LOW)
-for the given delay. For instance 
-
-      digitalWrite(ledPin, HIGH);
-      delay(400);
-      digitalWrite(ledPin, LOW);
-      delay(50);
-      digitalWrite(ledPin, HIGH);
-      delay(100);
-      digitalWrite(ledPin, LOW);
-      delay(50);
-      digitalWrite(ledPin, HIGH);
-      delay(75);
-
-Would correspond to a pattern of [400, 50, 100, 50, 50, 75]
-*/
-
 /**
  * Non-blocking LED pattern player.
  *

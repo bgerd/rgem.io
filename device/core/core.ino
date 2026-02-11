@@ -28,6 +28,9 @@ Mode last_state;
 Mode next_state;
 
 #include <ArduinoJson.h>
+// TODO:BEST-PRACTICE: This global JsonDocument is shared between TX (sendToggle) and RX (websocket
+// callback). Safe today because Arduino is single-threaded, but fragile — consider using local
+// JsonDocuments in each path to decouple TX and RX and prevent accidental cross-contamination.
 JsonDocument json_doc;
 
 // Use fast and lightweight base64 library for decoding gemState updates from the server
@@ -263,6 +266,9 @@ void loop() {
     case BOOT:
       // Should never be here
       ERROR_PRLN(F("Error. In BOOT state in loop()"));
+      // TODO:BEST-PRACTICE: Bare while(true) loops on fatal errors brick the device with no visual
+      // feedback and no recovery path. Consider driving the error LED pattern in the loop, or
+      // enabling a watchdog timer to force a hardware reset after a timeout.
       while(true);
       break;
     case PROVISIONING:

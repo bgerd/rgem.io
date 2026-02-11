@@ -60,6 +60,7 @@ namespace Keypad {
       wheelPos -= 170;
       return trellis.pixels.Color(0, wheelPos * 3, 255 - wheelPos * 3);
     }
+    // TODO:BEST-PRACTICE: Remove this unreachable return — the if/else-if/else above is exhaustive.
     return 0;
   }
   
@@ -109,6 +110,8 @@ namespace Keypad {
   }
 
   //////////////////
+  // TODO:BEST-PRACTICE: Rename `delay` parameter to `intervalMs` — it shadows Arduino's
+  // global delay() function, which would silently resolve to the parameter if called inside this body.
   void loopPattern(const uint16_t *pattern, size_t len, unsigned long delay = 100) {
     if(loop_timer == 0) {
       loop_timer = millis();

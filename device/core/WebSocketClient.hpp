@@ -10,13 +10,14 @@
 
 // Configure WebSocket client
 
-// TODO: Relocate this variables to global config file
-// TODO: Revisit WEBSOCKET_URL. What is it for? 
-
 #warning SSL Certificates for WEBSOCKET_HOST MUST be pre-loaded onto winc1500 firmware
-// TODO: Parameterize WEBSOCKET_HOST with build system
+// TODO: Parameterize WEBSOCKET_HOST with build system. Currently hardcoded to production (ws.rgem.io).
+// TODO:BEST-PRACTICE: WEBSOCKET_HOST should come from a build flag or config header so dev/stage/prod
+// environments are selectable at compile time, matching the backend's dev/stage/prod deployment model.
 #define WEBSOCKET_HOST "ws.rgem.io"
 #define WEBSOCKET_PORT 443
+
+// TODO: Revisit WEBSOCKET_URL. What is it for? 
 #define WEBSOCKET_URL "/"
 // NOTE: WebSocketsClient_Generic effectively blocks when trying to connect
 // WEBSOCKET_RECONNECT_INTERVAL_MS consequently determines duration of WAIT_FOR_WEBSOCKET 
