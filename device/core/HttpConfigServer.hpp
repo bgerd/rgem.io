@@ -10,6 +10,21 @@ namespace HttpConfigServer {
 
   char gemID[32];
 
+  // NOTE: Escapes &, <, >, " to prevent stored XSS when rendering
+  // user-supplied gemID into HTML attributes and body content.
+  void printHtmlEscaped(Response &res, const char* str) {
+    while (*str) {
+      switch (*str) {
+        case '&':  res.print(F("&amp;"));  break;
+        case '<':  res.print(F("&lt;"));   break;
+        case '>':  res.print(F("&gt;"));   break;
+        case '"':  res.print(F("&quot;")); break;
+        default:   res.write(*str);        break;
+      }
+      str++;
+    }
+  }
+
   void handleGetConfig(Request &req, Response &res) {
 
     // Serve a minimal, mobile-friendly HTML form
@@ -43,7 +58,7 @@ namespace HttpConfigServer {
           "<label for=\"gemID\">Gem ID:</label>"
           "<input id=\"gemID\" name=\"gemID\" type=\"text\" value=\""
     ));
-    res.print(gemID);
+    printHtmlEscaped(res, gemID);
     res.print(F(
           "\" placeholder=\"GEM ID required\" required maxlength=\"31\" "
           "style='width:100%;box-sizing:border-box;'>"
@@ -115,7 +130,7 @@ namespace HttpConfigServer {
         "<div class='spinner'></div>"
         "<div class='msg'>Connecting to Gem ID: <b>"
     ));
-    res.print(gemID);
+    printHtmlEscaped(res, gemID);
     res.print(F(
         "</b></div>"
       "</body>"

@@ -177,6 +177,15 @@ void setup() {
     &onClick,
     &onDoubleClick, 
     interruptPin);
+
+  // TODO: Long term remove HttpConfigServer and mDNS for on-device configuration. Replace with backend-led onboarding:
+  // - Use the device factory MAC as the unique key (already available in Networking). Backend hosts a config page at
+  //   a URL parameterized by a hash of the MAC (e.g. /config/<hash>), so the URL is stable and deterministic per
+  //   device without exposing the raw MAC. Each device gets a custom QR code sticker pointing to this URL.
+  // - User scans QR -> lands on backend config page -> sets gemId/credentials there; backend pushes config to the
+  //   device after connecting with MAC-based identity.
+  // - Operating HttpConfigServer and mDNS services are computationally expensive, with inconsistent behavior across Wifi networks.
+  //   E.g. the mDNS service is not reliable and often fails to register the service, or Wifi networks block traffic 
   HttpConfigServer::init();
 
   WebSocketConnection::init([](const char* payload ) -> void {
@@ -463,6 +472,7 @@ void do_wifi_connected() {
     // every WEBSOCKET_RECONNECT_INTERVAL_MS
 
     // Start webserver
+    // NOTE: We are starting BUT not serving/operating the webserver here!
     INFO_PRLN(F("Starting Web server ..."));
     HttpConfigServer::server.begin();
 
@@ -550,6 +560,7 @@ void do_wsocket_connected() {
   // Handle key presses ...
   Keypad::loop();
 
+  // NOTE: We only operate the mDNS and HttpConfigServer services when in WSOCKET_CONNECTED state!!
   // Respond to mDNS requests ... 
   Networking::mdns.run();
   
