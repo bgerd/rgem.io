@@ -110,14 +110,12 @@ namespace Keypad {
   }
 
   //////////////////
-  // TODO:BEST-PRACTICE: Rename `delay` parameter to `intervalMs` — it shadows Arduino's
-  // global delay() function, which would silently resolve to the parameter if called inside this body.
-  void loopPattern(const uint16_t *pattern, size_t len, unsigned long delay = 100) {
+  void loopPattern(const uint16_t *pattern, size_t len, unsigned long intervalMs = 100) {
     if(loop_timer == 0) {
       loop_timer = millis();
       update(pattern[0]);
-    } else if ((millis() - loop_timer) < delay * len) {
-      size_t index = (millis() - loop_timer) / delay;
+    } else if ((millis() - loop_timer) < intervalMs * len) {
+      size_t index = (millis() - loop_timer) / intervalMs;
       if (index < len) {
         update(pattern[index]);
       }
@@ -132,8 +130,8 @@ namespace Keypad {
     576, 12684, 4104, 0,
     1056, 51219, 32769, 0
   };  
-  void loopSeek(unsigned long delay = 100) {
-    loopPattern(PATTERN_SEEK, PATTERN_SEEK_LEN, delay);
+  void loopSeek(unsigned long intervalMs = 100) {
+    loopPattern(PATTERN_SEEK, PATTERN_SEEK_LEN, intervalMs);
   }
 
   //////////////////
@@ -141,8 +139,8 @@ namespace Keypad {
   const uint16_t PATTERN_SPINNER [] = {
     4680, 8772, 17442, 33825, 3120, 960
   };
-  void loopSpinner(unsigned long delay = 100) {
-    loopPattern(PATTERN_SPINNER, PATTERN_SPINNER_LEN, delay);
+  void loopSpinner(unsigned long intervalMs = 100) {
+    loopPattern(PATTERN_SPINNER, PATTERN_SPINNER_LEN, intervalMs);
   }
 
   //////////////////
@@ -150,8 +148,8 @@ namespace Keypad {
   const uint16_t PATTERN_SPIRAL [] = {
     1, 3, 7, 15, 143, 2191, 34959, 51343, 59535, 63631, 63887, 63903, 63902, 63900, 63896, 63888, 63760, 61712, 28944, 12560, 4368, 272, 16, 0
   };
-  void loopSpiral(unsigned long delay = 100) {
-    loopPattern(PATTERN_SPIRAL, PATTERN_SPIRAL_LEN, delay);
+  void loopSpiral(unsigned long intervalMs = 100) {
+    loopPattern(PATTERN_SPIRAL, PATTERN_SPIRAL_LEN, intervalMs);
   }
 
   //////////////////
@@ -159,8 +157,8 @@ namespace Keypad {
   const uint16_t PATTERN_ERROR [] = {
     38505, 0
   }; 
-  void loopError(unsigned long delay = 100) {
-    loopPattern(PATTERN_ERROR, PATTERN_ERROR_LEN, delay);
+  void loopError(unsigned long intervalMs = 100) {
+    loopPattern(PATTERN_ERROR, PATTERN_ERROR_LEN, intervalMs);
   }
 
   //////////////////
@@ -168,8 +166,8 @@ namespace Keypad {
   const uint16_t PATTERN_WARNING [] = {
     27030, 0
   }; 
-  void loopWarning(unsigned long delay = 100) {
-    loopPattern(PATTERN_WARNING, PATTERN_WARNING_LEN, delay);
+  void loopWarning(unsigned long intervalMs = 100) {
+    loopPattern(PATTERN_WARNING, PATTERN_WARNING_LEN, intervalMs);
   } 
 
 // ----- Tuning knobs -----
