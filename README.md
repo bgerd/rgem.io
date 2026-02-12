@@ -68,50 +68,44 @@ Three environments `dev`, `stage`, `prod` with their own CloudFormation stacks (
 
 ## Deployment Steps
 
-#### 1. Lint
+#### 1. Configure environment
+
+Run once after cloning (or to switch environments):
+
 ```bash
-# Lint CloudFormation template
+./configure.sh dev      # or stage, prod
+```
+
+This generates gitignored config files (`.env`, `frontend/.env`, `device/core/config.h`) that all other scripts and builds consume.
+
+#### 2. Lint
+```bash
 sam validate --lint
 ```
 
-#### 2. Build and deploy CloudFormation stack
+#### 3. Deploy backend
 
 ```bash
-# Must be re-run whenever handlers or template.yaml updated
-
-# Deploys rgem-dev
-# websocket endpoint: ws-dev.rgem.io
-# http endpoint: api-dev.rgem.io
-sam build && sam deploy --config-env dev
-
-# Deploys rgem-stage
-# websocket endpoint: ws-stage.rgem.io
-# http endpoint: api-stage.rgem.io
-sam build && sam deploy --config-env stage
-
-# Deploys rgem-prod
-# websocket endpoint: ws.rgem.io
-# http endpoint: api.rgem.io
-sam build && sam deploy --config-env prod
+./infra/scripts/deploy-backend.sh
 ```
-
-> **Note:** `sam deploy` with `resolve_s3 = true` (set in `samconfig.toml`) handles packaging automatically. If you set up a CI/CD pipeline where you need to package once and deploy to multiple environments separately, reintroduce `sam package` as a standalone step with an explicit `--s3-bucket` and `--output-template-file`, then deploy the packaged template via `sam deploy --template-file <packaged.yaml> --config-env <env>`.
 
 > **Note:** If the structure of `gemState` changes, you must clear the `GEM_STATE_TABLE` in DynamoDB before deploying.
 
-#### 3. Build, Package, and Deploy React Frontend
+#### 4. Deploy frontend
 
 ```bash
-# Deploys frontend to app-dev.rgem.io
-./infra/scripts/deploy-frontend.sh dev
-
-# Deploys frontend to app-stage.rgem.io
-./infra/scripts/deploy-frontend.sh stage
-
-# Deploys frontend to app.rgem.io
-./infra/scripts/deploy-frontend.sh prod
+./infra/scripts/deploy-frontend.sh
 ```
 
+#### 5. Tear down an environment (optional)
+
+To delete all AWS resources for an environment and start fresh:
+
+```bash
+./infra/scripts/force-delete-stack.sh
+```
+
+This empties S3 buckets, disables CloudFront, and deletes the CloudFormation stack. It reads the target environment from `.env` (set by `configure.sh`). After deletion completes, you can redeploy with steps 3 and 4.
 
 # Testing
 
@@ -122,24 +116,15 @@ Navigate your browser to
 - Prod: [app.rgem.io](app.rgem.io)
 
 ## Frontend (Local)
-In a terminal window, navigate to `frontend` subdirectory and set `VITE_WS_URL` for the current session :
+
+After running `./configure.sh <env>`, `frontend/.env` is generated with the correct `VITE_WS_URL`. Start the dev server:
 
 ```bash
-# Connects frontend to dev backend
-$ export VITE_WS_URL=wss://ws-dev.rgem.io
-
-# Connects frontend to stage backend
-$ export VITE_WS_URL=wss://ws-stage.rgem.io
-
-# Connects frontend to prod backend
-$ export VITE_WS_URL=wss://ws.rgem.io
+cd frontend
+npm run dev
 ```
 
-Then start the React development server and open a browser to http://localhost:5173/
-
-```bash
-$ npm run dev
-```
+Then open a browser to http://localhost:5173/
 
 Remember that in **React Strict Mode** components intentionally render twice in **development mode** to help find accidental side-effects and ensure components are resilient to being mounted and unmounted.
 
