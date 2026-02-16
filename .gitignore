@@ -32,4 +32,5 @@ packaged.yaml
 node_modules/
 package-lock.json
 .env
+samconfig.toml
 device/core/config.h

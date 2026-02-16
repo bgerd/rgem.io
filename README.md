@@ -54,7 +54,7 @@ The system has three components:
 ├── device/                     <-- Arduino hardware sketches
 ├── frontend/                   <-- React + TypeScript frontend
 ├── infra/                      <-- deployment scripts
-├── samconfig.toml              <-- SAM CLI environment config
+├── samconfig.toml.example      <-- SAM CLI environment config template (copy to samconfig.toml)
 └── template.yaml               <-- SAM template for Lambda + DynamoDB
 ```
 
@@ -68,7 +68,18 @@ Three environments `dev`, `stage`, `prod` with their own CloudFormation stacks (
 
 ## Deployment Steps
 
-#### 1. Configure environment
+#### 1. Create SAM config
+
+Copy the example and fill in your AWS-specific values (Hosted Zone ID, ACM Certificate ARN):
+
+```bash
+cp samconfig.toml.example samconfig.toml
+# Edit samconfig.toml — replace YOUR_HOSTED_ZONE_ID, YOUR_ACCOUNT_ID, and YOUR_CERTIFICATE_ID
+```
+
+> **Note:** `samconfig.toml` is gitignored because it contains account-specific infrastructure identifiers.
+
+#### 2. Configure environment
 
 Run once after cloning (or to switch environments):
 
@@ -78,12 +89,12 @@ Run once after cloning (or to switch environments):
 
 This generates gitignored config files (`.env`, `frontend/.env`, `device/core/config.h`) that all other scripts and builds consume.
 
-#### 2. Lint
+#### 3. Lint
 ```bash
 sam validate --lint
 ```
 
-#### 3. Deploy backend
+#### 4. Deploy backend
 
 ```bash
 ./infra/scripts/deploy-backend.sh
@@ -91,13 +102,13 @@ sam validate --lint
 
 > **Note:** If the structure of `gemState` changes, you must clear the `GEM_STATE_TABLE` in DynamoDB before deploying.
 
-#### 4. Deploy frontend
+#### 5. Deploy frontend
 
 ```bash
 ./infra/scripts/deploy-frontend.sh
 ```
 
-#### 5. Tear down an environment (optional)
+#### 6. Tear down an environment (optional)
 
 To delete all AWS resources for an environment and start fresh:
 
@@ -105,7 +116,7 @@ To delete all AWS resources for an environment and start fresh:
 ./infra/scripts/force-delete-stack.sh
 ```
 
-This empties S3 buckets, disables CloudFront, and deletes the CloudFormation stack. It reads the target environment from `.env` (set by `configure.sh`). After deletion completes, you can redeploy with steps 3 and 4.
+This empties S3 buckets, disables CloudFront, and deletes the CloudFormation stack. It reads the target environment from `.env` (set by `configure.sh`). After deletion completes, you can redeploy with steps 4 and 5.
 
 # Testing
 
