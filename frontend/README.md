@@ -1,73 +1,108 @@
-# React + TypeScript + Vite
+# virtual-rgem frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React 19 + TypeScript + Vite web client for [rgem.io](https://rgem.io) — a real-time collaborative RGB LED grid. Users interact with a shared 4x4 light pad: click to cycle colors, double-click to turn off.
 
-Currently, two official plugins are available:
+See the [root README](../README.md) for the full system architecture (backend, hardware, deployment).
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Prerequisites
 
-## React Compiler
+- **Node.js 18+** and npm
+- Run `./configure.sh <env>` from the **project root** first — this generates `frontend/.env` with the correct WebSocket and API URLs for your target environment. Do not create `.env` manually.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Getting Started
 
-## Expanding the ESLint configuration
+```bash
+# From the project root:
+./configure.sh dev
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+# Then:
+cd frontend
+npm install
+npm run dev        # http://localhost:5173
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+> **Strict Mode note:** React Strict Mode double-mounts in development, so the first WebSocket connection will fail with a console error. This is expected — the second mount succeeds.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Scripts
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+| Script          | Command                    | Description                                |
+|-----------------|----------------------------|--------------------------------------------|
+| `npm run dev`   | `vite`                     | Start dev server with HMR (localhost:5173) |
+| `npm run build` | `tsc -b && vite build`     | Type-check then production build to `dist/`|
+| `npm run lint`  | `eslint .`                 | Run ESLint (flat config)                   |
+| `npm run preview`| `vite preview`            | Preview production build locally           |
+
+## Project Structure
+
 ```
+src/
+├── main.tsx                      # Entry point: StrictMode + WebSocketProvider + App
+├── App.tsx                       # Top-level orchestrator: modes, connection, grid state
+├── lib/
+│   └── WebSocketProvider.tsx     # Generic WS transport (Context + hooks)
+├── components/
+│   ├── RGemGridPage.tsx          # 4x4 interactive color grid
+│   ├── RGemSelectorModal.tsx     # RGEM ID picker modal
+│   └── LoadingOverlay.tsx        # Full-screen connecting spinner
+├── types/
+│   └── grid.ts                   # Shared type definitions (AppMode, GridState, etc.)
+├── styles/
+│   └── globals.css               # All styles (`.rgem-*` prefixed classes)
+├── index.css                     # ⚠ Unused Vite template leftover
+├── App.css                       # ⚠ Unused Vite template leftover
+└── assets/
+    └── react.svg                 # ⚠ Unused Vite template leftover
+```
+
+## Application Flow
+
+The app has two modes:
+
+1. **Configuration** — The `RGemSelectorModal` overlays the grid. User picks an RGEM ID and clicks Connect.
+2. **Operation** — The modal hides and the live `RGemGridPage` is interactive.
+
+### Connection lifecycle
+
+1. On mount, `ensureConnected` opens a WebSocket (or reuses an existing one)
+2. User selects an RGEM ID and clicks Connect
+3. `connectToRgem` sends a `hello` message and awaits the first `update` (with a 10s timeout)
+4. On success, mode transitions from `configuration` to `operation`
+5. Ongoing `update` messages are applied to the grid; out-of-order updates are rejected by timestamp
+
+### Visibility / connectivity handling
+
+- **Tab hidden** → socket closes; **tab visible** → reconnects
+- **Offline** → socket closes; **online** → reconnects
+- **`pagehide`** / **`pageshow`** → same close/reconnect pattern
+- `?` key toggles cell ID label visibility (debugging aid)
+
+## Environment Variables
+
+Generated by `./configure.sh <env>` into `frontend/.env` (gitignored):
+
+| Variable       | Description          | dev                        | stage                        | prod                   |
+|----------------|----------------------|----------------------------|------------------------------|------------------------|
+| `VITE_WS_URL`  | WebSocket endpoint   | `wss://ws-dev.rgem.io`     | `wss://ws-stage.rgem.io`    | `wss://ws.rgem.io`    |
+| `VITE_API_URL`  | HTTP API endpoint   | `https://api-dev.rgem.io`  | `https://api-stage.rgem.io` | `https://api.rgem.io` |
+
+Access in code via `import.meta.env.VITE_WS_URL`.
+
+## Tech Stack
+
+| Dependency                  | Version  |
+|-----------------------------|----------|
+| React                       | ^19.2.0  |
+| TypeScript                  | ~5.9.3   |
+| Vite                        | ^7.2.4   |
+| ESLint                      | ^9.39.1  |
+| eslint-plugin-react-hooks   | ^7.0.1   |
+| eslint-plugin-react-refresh | ^0.4.24  |
+
+TypeScript is configured with `strict: true`, `noUnusedLocals`, `noUnusedParameters`, `noFallthroughCasesInSwitch`, and `erasableSyntaxOnly`. Only `src/**/*.tsx` files are included in the app tsconfig.
+
+## Known Issues
+
+- **Strict Mode double-mount** — First WebSocket connection fails in dev. Expected behavior; the second mount succeeds.
+- **Hardcoded RGEM IDs** — `RGEM_IDS` in `App.tsx` is a static array (`["test-1", "test-2", "default"]`). Should be fetched from the API.
+- **No test suite** — Manual testing only (see root README for wscat/curl instructions).
+- **Unused template files** — `src/index.css`, `src/App.css`, and `src/assets/react.svg` are Vite scaffolding leftovers; safe to delete.
