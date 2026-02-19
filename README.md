@@ -126,6 +126,13 @@ Navigate your browser to
 - Stage: [app-stage.rgem.io](app-stage.rgem.io)
 - Prod: [app.rgem.io](app.rgem.io)
 
+## Frontend (Unit Tests)
+
+```bash
+cd frontend
+npm run test
+```
+
 ## Frontend (Local)
 
 After running `./configure.sh <env>`, `frontend/.env` is generated with the correct `VITE_WS_URL`. Start the dev server:

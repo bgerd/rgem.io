@@ -45,14 +45,14 @@ Data flows down via props; events flow up via callbacks. No external state libra
 
 ### `src/App.tsx`
 - Top-level orchestrator: owns `mode`, `connectionStatus`, `gridState`, `selectedRgemId`, `isCellIdVisible`
-- Key functions: `ensureConnected`, `connectToRgem`, `handleConnect`, `handleGridClick`, `handleGridDblClick`, `decodeGemStateString`, `decodeTimestampString`, `createDefaultGrid`
+- Key functions: `ensureConnected`, `connectToRgem`, `handleConnect`, `handleGridClick`, `handleGridDblClick`
 - Manages visibility/online/offline event listeners
 - `?` keydown toggles `isCellIdVisible`
 - `RGEM_IDS` is hardcoded here (line 13)
 
 ### `src/components/RGemGridPage.tsx`
 - Renders the 4x4 grid of `<button>` cells
-- Key function: `logicalColorToCss` — converts `RgbColor` to CSS background
+- Imports `logicalColorToCss` from `../lib/color`
 - Stateless; receives `cells`, `onCellClick`, `onCellDoubleClick`, `isLabelVisible` via props
 
 ### `src/components/RGemSelectorModal.tsx`
@@ -64,7 +64,16 @@ Data flows down via props; events flow up via callbacks. No external state libra
 
 ### `src/types/grid.ts`
 - Type definitions: `AppMode`, `ConnectionStatus`, `RgbColor`, `GridState`
-- **Note:** tsconfig only includes `src/**/*.tsx` — this `.ts` file must be imported from a `.tsx` file to be checked
+
+### `src/lib/gem-state.ts`
+- Pure utility functions for decoding gem state wire protocol messages
+- Exports: `decodeTimestampString`, `decodeGemStateString`, `createDefaultGrid`
+- Unit tested in `gem-state.test.ts`
+
+### `src/lib/color.ts`
+- Pure utility function for converting logical RGB colors to CSS strings
+- Exports: `logicalColorToCss`
+- Unit tested in `color.test.ts`
 
 ### `src/styles/globals.css`
 - All styles use `.rgem-*` prefix — no unscoped class names
@@ -178,5 +187,6 @@ Reconnect uses jittered exponential backoff: `min(MAX, BASE * 2^(attempt-1)) * r
 npm run dev       # Dev server with HMR (localhost:5173)
 npm run build     # tsc -b && vite build
 npm run lint      # ESLint flat config
+npm run test      # Vitest unit tests
 npm run preview   # Preview production build
 ```

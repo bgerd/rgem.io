@@ -30,6 +30,7 @@ npm run dev        # http://localhost:5173
 | `npm run dev`   | `vite`                     | Start dev server with HMR (localhost:5173) |
 | `npm run build` | `tsc -b && vite build`     | Type-check then production build to `dist/`|
 | `npm run lint`  | `eslint .`                 | Run ESLint (flat config)                   |
+| `npm run test`  | `vitest`                   | Run unit tests (Vitest)                    |
 | `npm run preview`| `vite preview`            | Preview production build locally           |
 
 ## Project Structure
@@ -39,7 +40,11 @@ src/
 ├── main.tsx                      # Entry point: StrictMode + WebSocketProvider + App
 ├── App.tsx                       # Top-level orchestrator: modes, connection, grid state
 ├── lib/
-│   └── WebSocketProvider.tsx     # Generic WS transport (Context + hooks)
+│   ├── WebSocketProvider.tsx     # Generic WS transport (Context + hooks)
+│   ├── gem-state.ts              # Wire protocol decoding (base64 → GridState)
+│   ├── gem-state.test.ts         # Unit tests for gem-state utilities
+│   ├── color.ts                  # RGB → CSS color conversion
+│   └── color.test.ts             # Unit tests for color utilities
 ├── components/
 │   ├── RGemGridPage.tsx          # 4x4 interactive color grid
 │   ├── RGemSelectorModal.tsx     # RGEM ID picker modal
@@ -97,12 +102,13 @@ Access in code via `import.meta.env.VITE_WS_URL`.
 | ESLint                      | ^9.39.1  |
 | eslint-plugin-react-hooks   | ^7.0.1   |
 | eslint-plugin-react-refresh | ^0.4.24  |
+| Vitest                      | ^4.0.18  |
 
-TypeScript is configured with `strict: true`, `noUnusedLocals`, `noUnusedParameters`, `noFallthroughCasesInSwitch`, and `erasableSyntaxOnly`. Only `src/**/*.tsx` files are included in the app tsconfig.
+TypeScript is configured with `strict: true`, `noUnusedLocals`, `noUnusedParameters`, `noFallthroughCasesInSwitch`, and `erasableSyntaxOnly`. Both `src/**/*.ts` and `src/**/*.tsx` files are included in the app tsconfig.
 
 ## Known Issues
 
 - **Strict Mode double-mount** — First WebSocket connection fails in dev. Expected behavior; the second mount succeeds.
 - **Hardcoded RGEM IDs** — `RGEM_IDS` in `App.tsx` is a static array (`["test-1", "test-2", "default"]`). Should be fetched from the API.
-- **No test suite** — Manual testing only (see root README for wscat/curl instructions).
+- **Partial test coverage** — Unit tests cover pure utility functions (gem-state decoding, color conversion). No component or integration tests yet.
 - **Unused template files** — `src/index.css`, `src/App.css`, and `src/assets/react.svg` are Vite scaffolding leftovers; safe to delete.

@@ -23,6 +23,7 @@ export VITE_WS_URL=wss://ws-dev.rgem.io
 npm run dev          # localhost:5173
 npm run build        # Production build (includes tsc -b)
 npm run lint         # ESLint
+npm run test         # Vitest unit tests
 ```
 
 ### Deploy Frontend
@@ -105,7 +106,13 @@ HTTP POST `/gem/{gemId}`: body is int array `[0,1,2,...,7]` (16 elements, values
 
 ## Testing
 
-No automated test suite. Manual testing via:
+### Frontend (Unit)
+```bash
+cd frontend
+npm run test         # Vitest (28 tests across gem-state, color utilities)
+```
+
+### Manual
 - **wscat**: `wscat -c wss://ws-dev.rgem.io` then send JSON messages above
 - **curl**: `curl -X POST https://api-dev.rgem.io/gem/test-1 -d '[0,1,2,3,4,5,6,7,0,1,2,3,4,5,6,7]'`
 - **Frontend**: `npm run dev` with `VITE_WS_URL` env var
