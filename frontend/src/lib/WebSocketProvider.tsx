@@ -114,6 +114,10 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({
         RECONNECT_MAX_MS,
         RECONNECT_BASE_MS * 2 ** (reconnectAttemptRef.current - 1)
       );
+      // NOTE:FIX:LINT: react-hooks/purity — false positive; Math.random() is inside a function
+      // definition within useMemo, not called during render. scheduleReconnect is only invoked
+      // from event handlers and timers.
+      // eslint-disable-next-line react-hooks/purity
       const delay = Math.floor(exp * (0.8 + Math.random() * 0.4));
 
       // TODO: Test reconnect path
@@ -136,6 +140,10 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({
       if (pingTimerRef.current)
         window.clearTimeout(pingTimerRef.current);
 
+      // NOTE:FIX:LINT: react-hooks/purity — false positive; Date.now() is inside a function
+      // definition within useMemo, not called during render. scheduleNextPing is only invoked
+      // from event handlers and timers.
+      // eslint-disable-next-line react-hooks/purity
       const elapsedSinceTx = Date.now() - lastTxAtRef.current;
       const waitMs = Math.max(0, PING_IDLE_MS - elapsedSinceTx);
 
@@ -359,7 +367,9 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({
           // during unmount while a connection initiated during mount is still in progress.
           console.log("... Closing socket");
           socket.close(1000, why);
-        } catch {}
+          // NOTE:FIX:LINT: no-empty — catch is intentionally empty; socket.close() can throw
+          // on already-closed sockets (e.g., StrictMode double-unmount), which is harmless.
+        } catch { /* ignored */ }
       }
 
       // Note: oppenRejectRef will be null if the socket had already opened successfully
@@ -418,8 +428,11 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({
   );
 
   useEffect(() => {
+    // NOTE:FIX:LINT: react-hooks/exhaustive-deps — capture ref value in a local variable
+    // so cleanup uses the Set instance from mount time, not a potentially stale ref.
+    const handlers = messageHandlersRef.current;
     return () => {
-      messageHandlersRef.current.clear();
+      handlers.clear();
     };
   }, []);
 
@@ -443,7 +456,9 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({
   );
 };
 
-// Custom hook to access the WebSocketContext values via useContext
+// NOTE:FIX:LINT: react-refresh/only-export-components — co-locating a context provider with
+// its consumer hook is a standard React pattern; splitting them would reduce cohesion.
+// eslint-disable-next-line react-refresh/only-export-components
 export function useWebSocket(): WebSocketContextValue {
   const ctx = useContext(WebSocketContext);
   if (!ctx) {

@@ -159,7 +159,9 @@ export const App: React.FC = () => {
       const timer = setTimeout(() => {
         try {
           unsubscribeFirstUpdateHandler();
-        } catch {}
+          // NOTE:FIX:LINT no-empty — catch is intentionally empty; unsubscribe may
+          // already have been called by the resolve path, and double-unsubscribe is harmless.
+        } catch { /* ignored */ }
         reject(new Error("Timed out waiting for first update from server."));
       }, FIRST_UPDATE_TIMEOUT_MS);
 
@@ -331,7 +333,12 @@ export const App: React.FC = () => {
 
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, []);
+    // NOTE:FIX:LINT react-hooks/exhaustive-deps — ensureConnected is intentionally omitted.
+    // It uses the ref-to-latest pattern (selectedRgemIdRef) so the stale closure is safe.
+    // Adding it would cause the effect to re-run every render, re-registering all event listeners.
+    // closeSocket is stable (from useMemo) and included.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [closeSocket]);
 
   // Determines visibility of LoadingOverlay
   const isConnecting = (connectionStatus === "connecting"
