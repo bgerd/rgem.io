@@ -296,15 +296,20 @@ export const App: React.FC = () => {
     const onOnline = () => void ensureConnected("online");
     const onOffline = () => closeSocket("offline");
 
-    // We add the event listeners after ensuring connection to prevent
-    // race conditions during initial mount.
-    void ensureConnected("app_mount").then(() => {
-        document.addEventListener("visibilitychange", onVisibility);
-        window.addEventListener("pagehide", onPageHide);
-        window.addEventListener("pageshow", onPageShow);
-        window.addEventListener("online", onOnline);
-        window.addEventListener("offline", onOffline);
-    });
+    // NOTE:FIX: Register event listeners unconditionally before attempting connection.                                                                                                   
+    // Previously these were inside .then() after app_mount, as a workaround until                                                                                                      
+    // we fixed openSocket and closeSocket to be idempotent and resilient to multiple calls.                                                                                              
+    // The .then() gate meant listeners were never attached if the initial connection failed,                                                                                           
+    // preventing auto-recovery on visibility/online events.   
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pagehide", onPageHide);
+    window.addEventListener("pageshow", onPageShow);
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
+
+    void ensureConnected("app_mount").catch((err) =>
+      console.warn("[App] Initial connection failed, will retry on visibility/online:", err)
+    );
 
     // Handle ? key to toggle cell ID visibility
     const handleKeyDown = (event: KeyboardEvent) => {
