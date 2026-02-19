@@ -70,8 +70,6 @@ Data flows down via props; events flow up via callbacks. No external state libra
 - All styles use `.rgem-*` prefix — no unscoped class names
 - Imported once in `main.tsx`
 
-### Unused template files (safe to delete)
-- `src/index.css`, `src/App.css`, `src/assets/react.svg`
 
 ## Critical Patterns
 
@@ -171,7 +169,6 @@ Reconnect uses jittered exponential backoff: `min(MAX, BASE * 2^(attempt-1)) * r
 - **Event listeners registered unconditionally**: In `App.tsx`, visibility/online/offline listeners are registered before `ensureConnected("app_mount")`. Previously they were inside `.then()`, which meant they were never attached if the initial connection failed — preventing auto-recovery.
 - **`isConnecting` includes CLOSED state**: `App.tsx:340-343` — the `isConnecting` check includes `readyState === "CLOSED"`. This is intentional for the initial mount where the socket hasn't connected yet.
 - **tsconfig `include` is `.tsx` only**: `tsconfig.app.json` includes only `src/**/*.tsx`. Standalone `.ts` files (like `types/grid.ts`) are only type-checked if imported from a `.tsx` file.
-- **Unused template files**: `src/index.css`, `src/App.css`, `src/assets/react.svg` are not imported anywhere. Safe to delete.
 
 ## Commands
 
