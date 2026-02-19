@@ -82,16 +82,8 @@ export const App: React.FC = () => {
   // Application refs
 
   // Track the unsubscribe function for the current Update handler.
+  // NOTE: Cleanup is handled by the lifecycle useEffect (app_mount/app_unmount).
   const unsubscribeUpdateHandlerRef = useRef<(() => void) | null>(null);
-  useEffect(() => {
-    // On unmount, remove any registered update handler.
-    return () => {
-      if (unsubscribeUpdateHandlerRef.current) {
-        unsubscribeUpdateHandlerRef.current();
-        unsubscribeUpdateHandlerRef.current = null;
-      }
-    };
-  }, []);
 
   // Track the latest server-side update timestamp
   const latestUpdateTsRef = useRef<number | null>(null);
@@ -210,11 +202,11 @@ export const App: React.FC = () => {
 
       const typed = msg as { type?: string; gemState?: string; ts?: string };
       
-      // Guard: only handle the first valid update
+      // Guard: only process valid update messages
       if (typed.type === "update" && typeof typed.gemState === "string" && typeof typed.ts === "string") {
-      
+
         const timestamp = decodeTimestampString(typed.ts);
-        if(timestamp > latestUpdateTsRef.current!) {
+        if(latestUpdateTsRef.current === null || timestamp > latestUpdateTsRef.current) {
           latestUpdateTsRef.current = timestamp;
           const nextGrid = decodeGemStateString(typed.gemState);
           setGridState(nextGrid);
@@ -243,18 +235,17 @@ export const App: React.FC = () => {
     setConnectionError(null);
     setConnectionStatus("connecting");
 
-    await connectToRgem("handle_connect").then(() => {
+    try {
+      await connectToRgem("handle_connect");
       setConnectionStatus("connected");
       setMode("operation"); // configuration -> operation
-    }).catch((err) => {
-      
+    } catch (err) {
       // TODO: Revisit appropriate error handling strategy
       console.error("Failed to connect to RGEM:", err);
       setConnectionStatus("error");
       setConnectionError("Unable to connect. Please try again.");
       setMode("configuration");
-      
-    });
+    }
   };
 
   // Handle a click on a grid cell in the RGemGridPage
