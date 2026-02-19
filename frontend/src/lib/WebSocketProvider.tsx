@@ -295,6 +295,10 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({
         openPromiseRef.current = null;
 
         closeSocket("websocket_closed_due_to_error");
+        // NOTE:FIX: Schedule reconnect on error. Previously only the pong-timeout
+        // path triggered reconnection, so server-initiated closes and errors left
+        // the app in CLOSED state with no automatic recovery.
+        scheduleReconnect();
       };
 
       handleCloseRef.current = (event: CloseEvent) => {
@@ -309,6 +313,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({
         openPromiseRef.current = null;
 
         closeSocket("websocket_closed_by_server");
+        scheduleReconnect();
       };
 
       /////////////
