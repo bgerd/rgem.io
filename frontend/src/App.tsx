@@ -157,9 +157,10 @@ export const App: React.FC = () => {
           unsubscribeFirstUpdateHandler();
           
           resolve(initialGrid);
-        } else {
-          reject(new Error(`Received non-update message or invalid initial gemState, ignoring: ${JSON.stringify(msg)}`));
         }
+        // NOTE:FIX: Ignore pong, hb, and other non-update messages silently.
+        // Previously called reject() and threw an error, which broke the connection flow
+        // if a pong or heartbeat arrived before the first update.
       });
 
       // Attach timeout; remember to clear it on resolve/reject
