@@ -345,7 +345,6 @@ export const App: React.FC = () => {
   // Determines visibility of LoadingOverlay
   const isConnecting = (connectionStatus === "connecting"
     || readyState === "CONNECTING"
-    || readyState === "CLOSING"
     || readyState === "CLOSED");
 
   return (

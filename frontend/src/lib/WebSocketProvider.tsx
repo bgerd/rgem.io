@@ -22,8 +22,7 @@ function getWebSocketUrl(): string {
 // Note: ReadyState is only set to CONNECTING by openSocket(),
 // only set to OPEN by the socket 'open' event handler,
 // and only set to CLOSED by closeSocket()
-// TODO: Eliminate CLOSING state
-type ReadyState = "CLOSED" | "CONNECTING" | "OPEN" | "CLOSING";
+type ReadyState = "CLOSED" | "CONNECTING" | "OPEN";
 
 // Defines Context's shared attributes and their types.
 type WebSocketContextValue = {

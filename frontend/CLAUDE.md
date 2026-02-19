@@ -20,7 +20,7 @@ main.tsx
 
 ```ts
 {
-  readyState: ReadyState;                                    // "CLOSED" | "CONNECTING" | "OPEN" | "CLOSING"
+  readyState: ReadyState;                                    // "CLOSED" | "CONNECTING" | "OPEN"
   openSocket: (why: string) => Promise<void>;                // Opens WS; resolves on OPEN
   addMessageHandler: (handler: (msg: unknown) => void) => () => void;  // Returns unsubscribe fn
   sendJson: (data: unknown) => void;                         // JSON.stringify + send
@@ -120,10 +120,12 @@ On failure, mode reverts to `"configuration"`.
 ### ReadyState (`WebSocketProvider.tsx`)
 ```
 "CLOSED" ──openSocket──> "CONNECTING" ──handleOpen──> "OPEN"
-   ^                                                    │
-   └────────────────closeSocket─────────────────────────┘
+   ^                          │                         │
+   │                          │                         │
+   └──────────────────closeSocket───────────────────────┘
+   │                          │
+   └──scheduleReconnect───────┘  (on handleClose, handleError, pong timeout)
 ```
-`"CLOSING"` is defined in the type but never set. TODO exists to remove it.
 
 ## Data Encoding
 
