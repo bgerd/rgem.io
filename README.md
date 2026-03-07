@@ -1,16 +1,38 @@
-# RGEM.io
+# rgem.io
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
-A real-time collaborative RGB LED grid. Multiple users can interact with a shared 4x4 (16-cell) light pad simultaneously — through a web browser or a physical hardware keypad — and see each other's changes instantly. Clicking a cell cycles it through 8 colors; double-clicking turns it off.
+**A shared light you can touch from anywhere.**
 
-> **Note:** This is a portfolio/demo project. The code is fully functional and deployed, but the repository is not yet self-contained enough to reproduce from scratch. Known gaps:
->
-> - **AWS infrastructure** — Deployment requires a pre-existing AWS account with Route 53 hosted zones, ACM certificates, and configured credentials. These are referenced by `samconfig.toml` (gitignored) but not provisioned by the repo itself.
-> - **WINC1500 firmware tooling** — The hardware device uses an Atmel WINC1500 WiFi module with upgraded firmware and a custom WiFi provisioning page. The x86-specific scripts and binary tools used to flash the module are not included in this repo.
-> - **Patched WiFi101_Generic library** — The device firmware depends on a custom-patched version of the WiFi101_Generic Arduino library, which is not published or included here.
->
-> The frontend and backend code can be read, reviewed, and understood as-is. Contributions and questions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
+**[Try the live demo →](https://app.rgem.io)** · **[rgem.io](https://rgem.io)**
+
+---
+
+rgem.io is an ongoing project exploring shared presence across distance — how simple, tangible interactions can connect people who aren't in the same room.
+
+Its current form is a real-time collaborative light grid: sixteen colored cells, synchronized across web browsers and multiple custom-built hardware devices. Each device is battery-powered and WiFi-connected — fully wireless, fully mobile — navigating real constraints around power, connectivity, and reliability.
+
+The system is live. Tap a cell in the [web demo](https://app.rgem.io) right now and physical LEDs on devices in Brooklyn light up. Every connected client — web or hardware — sees the same state, instantly.
+
+The premise started with a question about physical proximity: the way shared objects create presence between people. A candle burning in two rooms. A stone split in half and carried apart. The first working version was an anniversary gift — a small physical object on each of our desks that we could touch to signal each other across distance. No words, no notifications, just shared light.
+
+### Try it now
+
+1. Open [app.rgem.io](https://app.rgem.io) in two or more browser windows
+2. Select the same rgem (e.g. "default") in both and hit **Connect**
+3. Tap any cell in one window and watch the other update in real time
+
+### Project status
+
+This is an active project. The web frontend and serverless backend are deployed and fully functional. The hardware component — a custom-built device using an [Adafruit NeoTrellis](https://www.adafruit.com/product/4352) keypad and [Feather M0 WiFi](https://www.adafruit.com/product/3010) (ATSAMD21 + ATWINC1500), modified with battery power — is manufactured and operational. The codebase can be read, reviewed, and understood as-is, but the repository is not yet self-contained enough to reproduce from scratch.
+
+**Known gaps for reproducibility:**
+
+- **AWS infrastructure** — Deployment requires a pre-existing AWS account with Route 53 hosted zones, ACM certificates, and configured credentials. These are referenced by `samconfig.toml` (gitignored) but not provisioned by the repo itself.
+- **WINC1500 firmware tooling** — The hardware device uses an Atmel WINC1500 WiFi module with upgraded firmware and a custom WiFi provisioning page. The x86-specific scripts and binary tools used to flash the module are not included in this repo.
+- **Patched WiFi101_Generic library** — The device firmware depends on a custom-patched version of the WiFi101_Generic Arduino library, which is not published or included here.
+
+Contributions and questions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Architecture
 
