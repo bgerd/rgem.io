@@ -2,6 +2,15 @@
   "name": "virtual-rgem",
   "private": true,
   "version": "1.0.1",
+  "description": "Web frontend for RGEM.io — a real-time collaborative RGB LED grid",
+  "license": "Apache-2.0",
+  "author": "bgerd",
+  "homepage": "https://github.com/bgerd/rgem.io#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bgerd/rgem.io.git",
+    "directory": "frontend"
+  },
   "type": "module",
   "scripts": {
     "dev": "vite",

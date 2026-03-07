@@ -1,6 +1,16 @@
 # RGEM.io
 
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+
 A real-time collaborative RGB LED grid. Multiple users can interact with a shared 4x4 (16-cell) light pad simultaneously — through a web browser or a physical hardware keypad — and see each other's changes instantly. Clicking a cell cycles it through 8 colors; double-clicking turns it off.
+
+> **Note:** This is a portfolio/demo project. The code is fully functional and deployed, but the repository is not yet self-contained enough to reproduce from scratch. Known gaps:
+>
+> - **AWS infrastructure** — Deployment requires a pre-existing AWS account with Route 53 hosted zones, ACM certificates, and configured credentials. These are referenced by `samconfig.toml` (gitignored) but not provisioned by the repo itself.
+> - **WINC1500 firmware tooling** — The hardware device uses an Atmel WINC1500 WiFi module with upgraded firmware and a custom WiFi provisioning page. The x86-specific scripts and binary tools used to flash the module are not included in this repo.
+> - **Patched WiFi101_Generic library** — The device firmware depends on a custom-patched version of the WiFi101_Generic Arduino library, which is not published or included here.
+>
+> The frontend and backend code can be read, reviewed, and understood as-is. Contributions and questions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Architecture
 
@@ -62,9 +72,13 @@ The system has three components:
 
 ## Prerequisites
 
-You can install the [AWS SAM CLI](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-install.html) and use it to package, deploy, and describe the application. 
+- [Node.js 20](https://nodejs.org/)
+- [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) (configured with credentials)
+- [AWS SAM CLI](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-install.html)
+- [Python 3](https://www.python.org/) (required by SAM CLI)
+- [Arduino IDE](https://www.arduino.cc/en/software) (for hardware development only)
 
-Three environments `dev`, `stage`, `prod` with their own CloudFormation stacks (E.g. `rgem-dev`, `rgem-stage` and `rgem-prod`) are defined by `samconfig.toml`. 
+Three environments `dev`, `stage`, `prod` with their own CloudFormation stacks (E.g. `rgem-dev`, `rgem-stage` and `rgem-prod`) are defined by `samconfig.toml`.
 
 ## Deployment Steps
 
@@ -232,3 +246,11 @@ All connected websockets subscribed to `<gemId>` should immediately receive the 
 Note: The HTTP response echoes the raw array, while WebSocket clients receive the encoded grid payload.
 
 #### **Note:** fixed `dev`, `stage`, `prod` custom domains can be used in place of `execute-api` endpoints. When using custom domains, omit the `/Prod` suffix (e.g., `wss://ws-dev.rgem.io`).
+
+## Contributing
+
+Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, coding conventions, and pull request guidelines.
+
+## License
+
+This project is licensed under the Apache License 2.0 — see the [LICENSE](LICENSE) file for details.
