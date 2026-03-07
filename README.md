@@ -4,7 +4,7 @@
 
 **A shared light you can touch from anywhere.**
 
-**[Try the live demo →](https://app.rgem.io)** · **[rgem.io](https://rgem.io)**
+**[Try the live demo →](#try-it-now)**
 
 ---
 
@@ -12,7 +12,7 @@ rgem.io is an ongoing project exploring shared presence across distance — how 
 
 Its current form is a real-time collaborative light grid: sixteen colored cells, synchronized across web browsers and multiple custom-built hardware devices. Each device is battery-powered and WiFi-connected — fully wireless, fully mobile — navigating real constraints around power, connectivity, and reliability.
 
-The system is live. Tap a cell in the [web demo](https://app.rgem.io) right now and physical LEDs on devices in Brooklyn light up. Every connected client — web or hardware — sees the same state, instantly.
+The system is live. Tap a cell in the [web demo](#try-it-now) right now and physical LEDs on devices in Brooklyn light up. Every connected client — web or hardware — sees the same state, instantly.
 
 The premise started with a question about physical proximity: the way shared objects create presence between people. A candle burning in two rooms. A stone split in half and carried apart. The first working version was an anniversary gift — a small physical object on each of our desks that we could touch to signal each other across distance. No words, no notifications, just shared light.
 
