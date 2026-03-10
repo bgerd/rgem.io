@@ -16,13 +16,13 @@ The system is live. Tap a cell in the [web demo](#try-it-now) right now and phys
 
 The premise started with a question about physical proximity: the way shared objects create presence between people. A candle burning in two rooms. A stone split in half and carried apart. The first working version was an anniversary gift — a small physical object on each of our desks that we could touch to signal each other across distance. No words, no notifications, just shared light.
 
-### Try it now
+## Try It Now
 
 1. Open [app.rgem.io](https://app.rgem.io) in two or more browser windows
 2. Select the same rgem (e.g. "default") in both and hit **Connect**
 3. Tap any cell in one window and watch the other update in real time
 
-### Project status
+## Project Status
 
 This is an active project. The web frontend and serverless backend are deployed and fully functional. The hardware component — a custom-built device using an [Adafruit NeoTrellis](https://learn.adafruit.com/adafruit-neotrellis/overview) keypad and [Adafruit Feather M0 WiFi](https://www.adafruit.com/product/3010) (ATSAMD21 + ATWINC1500), modified with battery power — is manufactured and operational. The codebase can be read, reviewed, and understood as-is, but the repository is not yet self-contained enough to reproduce from scratch.
 
@@ -37,7 +37,7 @@ Contributions and questions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.m
 ## Architecture
 
 ```
-                      Hardware                          RGem App  
+                      Hardware                          RGem App
           (NeoTrellis + ATSAMD21 + ATWINC1500)          (React)
                           |                                |
                           |  WebSocket                     |  WebSocket
@@ -65,12 +65,12 @@ The system has three components:
 
 ### Tech Stack
 
-| Component | Technologies |
-|-----------|-------------|
+| Component    | Technologies |
+|--------------|-------------|
 | RGem App     | React 19, TypeScript, Vite |
 | Landing Page | Static HTML |
-| Backend   | AWS Lambda (Node.js 20), API Gateway (HTTP + WebSocket), DynamoDB, SAM/CloudFormation |
-| Hardware  | [Adafruit NeoTrellis](https://learn.adafruit.com/adafruit-neotrellis/overview) keypad + [Adafruit Feather M0 WiFi](https://www.adafruit.com/product/3010) (ATSAMD21 + ATWINC1500) |
+| Backend      | AWS Lambda (Node.js 20), API Gateway (HTTP + WebSocket), DynamoDB, SAM/CloudFormation |
+| Hardware     | [Adafruit NeoTrellis](https://learn.adafruit.com/adafruit-neotrellis/overview) keypad + [Adafruit Feather M0 WiFi](https://www.adafruit.com/product/3010) (ATSAMD21 + ATWINC1500) |
 
 ## Project Structure
 
@@ -94,9 +94,9 @@ The system has three components:
 └── template.yaml               <-- SAM template for Lambda + DynamoDB
 ```
 
-# Remote Deployment
+## Remote Deployment
 
-## Prerequisites
+### Prerequisites
 
 - [Node.js 20](https://nodejs.org/)
 - [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) (configured with credentials)
@@ -106,7 +106,7 @@ The system has three components:
 
 Three environments `dev`, `stage`, `prod` with their own CloudFormation stacks (e.g. `rgem-dev`, `rgem-stage` and `rgem-prod`) are defined by `samconfig.toml`.
 
-## Deployment Steps
+### Deployment Steps
 
 #### 1. Create SAM config
 
@@ -136,6 +136,7 @@ This generates gitignored config files (`.env`, `app/.env`, `device/core/config.
 > If it's wrong, re-run `./configure.sh <env>` before proceeding.
 
 #### 3. Lint
+
 ```bash
 sam validate --lint
 ```
@@ -146,7 +147,7 @@ sam validate --lint
 ./infra/scripts/deploy-backend.sh
 ```
 
-> **Note:** If the structure of `gemState` changes, you must clear the `GEM_STATE_TABLE` in DynamoDB before deploying.
+> **Note:** If the `gemState` structure changes, clear DynamoDB tables before deploying: `./infra/scripts/clear-tables.sh`
 
 #### 5. Deploy RGem App
 
@@ -170,11 +171,11 @@ To delete all AWS resources for an environment and start fresh:
 
 This empties S3 buckets, disables CloudFront, and deletes the CloudFormation stack. It reads the target environment from `.env` (set by `configure.sh`). After deletion completes, you can redeploy with steps 4, 5, and (for prod) 6.
 
-# Infrastructure Operations
+## Infrastructure Operations
 
 Not all changes to `template.yaml` behave the same way in CloudFormation. Use the table below to choose the right action before deploying.
 
-## Change Decision Table
+### Change Decision Table
 
 | Change type | Action required | Commands |
 |---|---|---|
@@ -188,7 +189,7 @@ Not all changes to `template.yaml` behave the same way in CloudFormation. Use th
 
 > ¹ After tear-down, follow [Deployment Steps](#deployment-steps) to redeploy backend, app, and (for prod) landing page.
 
-## API Gateway: Forcing a New Deployment
+### API Gateway: Forcing a New Deployment
 
 `AWS::ApiGatewayV2::Deployment` resources are immutable snapshots. CloudFormation will **not** automatically create a new deployment when routes or integrations change — it only does so when the `Deployment` resource's own properties change.
 
@@ -204,7 +205,7 @@ Description: "rev: 2"
 
 This applies to both `RGempadHttpApiDeployment` and `RGempadWSApiDeployment`. Skipping this step means Lambda receives the updated code but API Gateway continues routing to the old integration.
 
-## Clearing DynamoDB Tables
+### Clearing DynamoDB Tables
 
 Required when the `gemState` encoding or structure changes (see Key Gotchas in CLAUDE.md), or when you want a clean slate without tearing down the stack.
 
@@ -214,7 +215,7 @@ Required when the `gemState` encoding or structure changes (see Key Gotchas in C
 
 This clears both `GEM_STATE_TABLE` (gem state) and `CONNECTIONS_TABLE` (active WebSocket connections). Connected clients will be dropped and will reconnect automatically.
 
-## Full Stack Tear-Down
+### Full Stack Tear-Down
 
 Required when CloudFormation must **replace** a resource that cannot be updated in-place: DynamoDB primary key changes, `RouteSelectionExpression` changes, S3 bucket name changes, or a stack stuck in a rollback state.
 
@@ -229,23 +230,24 @@ Required when CloudFormation must **replace** a resource that cannot be updated 
 
 After deletion, redeploy from scratch using steps 4–6 in the [Deployment Steps](#deployment-steps) section above.
 
-# Testing
+## Testing
 
-## RGem App
+### RGem App
 
-Navigate your browser to
-- Dev: [app-dev.rgem.io](app-dev.rgem.io)
-- Stage: [app-stage.rgem.io](app-stage.rgem.io)
-- Prod: [app.rgem.io](app.rgem.io)
+Navigate your browser to:
 
-## RGem App (Unit Tests)
+- Dev: [app-dev.rgem.io](https://app-dev.rgem.io)
+- Stage: [app-stage.rgem.io](https://app-stage.rgem.io)
+- Prod: [app.rgem.io](https://app.rgem.io)
+
+### Unit Tests
 
 ```bash
 cd app
 npm run test
 ```
 
-## RGem App (Local)
+### Local Development
 
 After running `./configure.sh <env>`, `app/.env` is generated with the correct `VITE_WS_URL`. Start the dev server:
 
@@ -256,54 +258,53 @@ npm run dev
 
 Then open a browser to http://localhost:5173/
 
-Remember that in **React Strict Mode** components intentionally render twice in **development mode** to help find accidental side-effects and ensure components are resilient to being mounted and unmounted.
+Remember that in **React Strict Mode** components intentionally render twice in **development mode** to help find accidental side-effects and ensure components are resilient to being mounted and unmounted. When running locally, the first WebSocket connection is expected to fail because it is closed before the connection is established.
 
-So when running locally, we expect an initial WebSocket connection to fail, because it is closed before the connection is established.
-
-## Landing Page
+### Landing Page
 
 Navigate to [rgem.io](https://rgem.io) (prod only). `www.rgem.io` should redirect to `rgem.io`.
 
-## Backend
+### Backend
 
-The rgempad API has two separate `ApiGateways`, one for `HTTP` connections (e.g. `RGempadHttpApi`) and another for `WEBSOCKET` connections (e.g. `RGempadWSApi`) per environment / CloudFormation stack.
+The rgempad API has two separate API Gateways: one for HTTP connections (`RGempadHttpApi`) and one for WebSocket connections (`RGempadWSApi`) per environment / CloudFormation stack.
 
-To test the WebSocket API, you can use [wscat](https://github.com/websockets/wscat), an open-source command line tool.
+To test the WebSocket API, use [wscat](https://github.com/websockets/wscat):
 
-#### 1. [Install NPM](https://www.npmjs.com/get-npm).
-#### 2. Install wscat:
-
-```bash
-$ npm install -g wscat
-```
-
-#### 3. On the console, connect to your published websocket API endpoint by executing the following command:
+#### 1. Install wscat
 
 ```bash
-$ wscat -c wss://<RGempadWSApi-ID>.execute-api.<YOUR-REGION>.amazonaws.com/Prod
+npm install -g wscat
 ```
 
-#### 4.a. To test the app-level **ping** function, send the following JSON messages over a connected websocket. 
+#### 2. Connect
+
+```bash
+wscat -c wss://<RGempadWSApi-ID>.execute-api.<YOUR-REGION>.amazonaws.com/Prod
+```
+
+> **Note:** Fixed custom domains can be used in place of `execute-api` endpoints. When using custom domains, omit the `/Prod` suffix (e.g., `wss://ws-dev.rgem.io`).
+
+#### 3. Test ping
 
 ```
 > { "type": "ping" }
-< { "type": "pong"}
+< { "type": "pong" }
 ```
 
-Note that an app-level ping is distinct from a protocol/control-level ping. 
-- The former is sent by the virtual RGEM pad instead of the latter, because there is no JavaScript API for sending control-level pings. 
-- RGEM pad devices only send control-level pings, which are handled by the API Gateway
+Note that an app-level ping is distinct from a protocol/control-level ping. The former is sent by the virtual RGEM pad because there is no JavaScript API for sending control-level pings. Hardware devices only send control-level pings, which are handled by API Gateway.
 
-#### 4.b. To test the **hello** function, send the following JSON messages over a connected websocket. 
-The connection will then be subscribed to `<gemId>` and it will immediately receive its current state.
+#### 4. Test hello (subscribe)
 
 ```
 > { "type": "hello", "gemId": "<gemId>" }
-< { "type":"update", "gemState": "<base64-48-bytes>", "ts": "<base64-8-bytes>" }
+< { "type": "update", "gemState": "<base64-48-bytes>", "ts": "<base64-8-bytes>" }
 ```
-Note: `gemState` is a base64-encoded 48-byte payload representing 16 RGB triplets (16×3 bytes). `ts` is a base64-encoded 8-byte Big-Endian timestamp (milliseconds since epoch) used by clients to discard out-of-order updates.
 
-#### 4.c. To test the **toggle** WebSocket function, send the following JSON messages over a connected WebSocket subscribed to `<gemId>`
+The connection will be subscribed to `<gemId>` and will immediately receive its current state.
+
+> `gemState` is a base64-encoded 48-byte payload representing 16 RGB triplets (16×3 bytes). `ts` is a base64-encoded 8-byte Big-Endian timestamp (milliseconds since epoch) used by clients to discard out-of-order updates.
+
+#### 5. Test toggle
 
 ```
 > { "type": "toggle", "e": "keydown", "num": 0 }
@@ -312,42 +313,50 @@ Note: `gemState` is a base64-encoded 48-byte payload representing 16 RGB triplet
 - `"num"`: cell index (0–15)
 - `"e"`: event type — `"keydown"` cycles the cell through colors 1–8, `"dblclick"` turns the cell off
 
-All connected websockets subscribed to `<gemId>` should immediately receive the following:
+All connected websockets subscribed to `<gemId>` should immediately receive:
 
 ```
-< { "type":"update", "gemState": "<base64-48-bytes>", "ts": "<base64-8-bytes>" }
+< { "type": "update", "gemState": "<base64-48-bytes>", "ts": "<base64-8-bytes>" }
 ```
 
-#### 5. To test the **schedhb** function, all connected websockets subscribed to **ANY** `<gemId>` should receive the following every 9 minutes:
+#### 6. Test scheduled heartbeat
+
+All connected websockets subscribed to **any** `<gemId>` should receive the following every 9 minutes:
 
 ```
-< { "type":"hb" }
+< { "type": "hb" }
 ```
 
-#### 6. To test the **gempost** HTTP function, while connected and subscribed to `<gemID>` via `wscat` as shown above, in a separate terminal POST a JSON message like the following example:
+#### 7. Test gempost (HTTP)
+
+While connected and subscribed to `<gemId>` via wscat, POST a gem state from a separate terminal:
 
 ```
-# dev rest_api_host: api-dev.rgem.io
-# stage rest_api_host: api-stage.rgem.io
-# prod rest_api_host: api.rgem.io
+# dev:   api-dev.rgem.io
+# stage: api-stage.rgem.io
+# prod:  api.rgem.io
 ```
 
 ```bash
-$ curl -X POST \ 
+curl -X POST \
   https://<rest_api_host>/gem/<gemId> \
   -H "Content-Type: application/json" \
   --data-raw '[0,6,6,0,6,2,2,6,0,4,4,0,2,5,5,1]'
-< { "gemId":"<gemId>", "echo": <gemState> }
 ```
 
-All connected websockets subscribed to `<gemId>` should immediately receive the following:
+Response:
+
+```json
+{ "gemId": "<gemId>", "echo": <gemState> }
+```
+
+All connected websockets subscribed to `<gemId>` should immediately receive:
 
 ```
-< { "type":"update", "gemState": "<base64-48-bytes>", "ts": "<base64-8-bytes>" }
+< { "type": "update", "gemState": "<base64-48-bytes>", "ts": "<base64-8-bytes>" }
 ```
-Note: The HTTP response echoes the raw array, while WebSocket clients receive the encoded grid payload.
 
-#### **Note:** fixed `dev`, `stage`, `prod` custom domains can be used in place of `execute-api` endpoints. When using custom domains, omit the `/Prod` suffix (e.g., `wss://ws-dev.rgem.io`).
+> The HTTP response echoes the raw array, while WebSocket clients receive the encoded grid payload.
 
 ## Contributing
 
