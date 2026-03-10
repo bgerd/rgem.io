@@ -15,6 +15,7 @@ source "${ENV_FILE}"
 
 STACK_NAME="rgem-${RGEM_ENV}"
 APP_BUCKET="rgem-${RGEM_ENV}-app-bucket"
+LANDING_BUCKET="rgem-${RGEM_ENV}-landing-bucket"
 
 echo "=== Force-delete CloudFormation stack ==="
 echo "  Environment : ${RGEM_ENV}"
@@ -90,6 +91,20 @@ disable_distribution "${APP_DIST_ID}"
 echo "Emptying S3 bucket ${APP_BUCKET}..."
 aws s3 rm "s3://${APP_BUCKET}" --recursive 2>/dev/null || echo "Bucket ${APP_BUCKET} not found or already empty; continuing."
 
+# Prod-only: disable landing distribution and empty landing bucket
+if [[ "${RGEM_ENV}" == "prod" ]]; then
+  LANDING_DIST_ID=$(aws cloudformation describe-stacks \
+    --stack-name "${STACK_NAME}" \
+    --region "${REGION}" \
+    --query "Stacks[0].Outputs[?OutputKey=='LandingDistributionId'].OutputValue" \
+    --output text 2>/dev/null || true)
+
+  disable_distribution "${LANDING_DIST_ID}"
+
+  echo "Emptying S3 bucket ${LANDING_BUCKET}..."
+  aws s3 rm "s3://${LANDING_BUCKET}" --recursive 2>/dev/null || echo "Bucket ${LANDING_BUCKET} not found or already empty; continuing."
+fi
+
 # Delete the CloudFormation stack
 echo "Deleting stack ${STACK_NAME}..."
 aws cloudformation delete-stack \
@@ -103,4 +118,4 @@ aws cloudformation wait stack-delete-complete \
 
 echo ""
 echo "Stack '${STACK_NAME}' deleted successfully."
-echo "You can now redeploy with deploy-backend.sh and deploy-app.sh."
+echo "You can now redeploy with deploy-backend.sh, deploy-app.sh, and (for prod) deploy-landing.sh."

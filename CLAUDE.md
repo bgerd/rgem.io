@@ -10,6 +10,12 @@ Three-tier serverless: React frontend <-> AWS API Gateway (WebSocket + HTTP) + L
 
 ## Quick Reference Commands
 
+### Check current environment
+```bash
+cat .env             # shows RGEM_ENV, RGEM_WS_HOST, RGEM_API_HOST
+./configure.sh dev   # re-stamp to a different environment (dev | stage | prod)
+```
+
 ### Backend
 ```bash
 sam validate --lint
@@ -31,16 +37,21 @@ npm run test         # Vitest unit tests
 ./infra/scripts/deploy-app.sh   # S3 + CloudFront invalidation
 ```
 
+### Deploy Landing (prod only)
+```bash
+./infra/scripts/deploy-landing.sh   # S3 sync + CloudFront invalidation
+```
+
 ### Hardware
 Compile and upload via Arduino IDE.
 
 ## Environments
 
-| Env   | WebSocket        | HTTP API          | App               |
-|-------|------------------|-------------------|-------------------|
-| dev   | ws-dev.rgem.io   | api-dev.rgem.io   | app-dev.rgem.io   |
-| stage | ws-stage.rgem.io | api-stage.rgem.io | app-stage.rgem.io |
-| prod  | ws.rgem.io       | api.rgem.io       | app.rgem.io       |
+| Env   | WebSocket        | HTTP API          | App               | Landing   |
+|-------|------------------|-------------------|-------------------|-----------|
+| dev   | ws-dev.rgem.io   | api-dev.rgem.io   | app-dev.rgem.io   | —         |
+| stage | ws-stage.rgem.io | api-stage.rgem.io | app-stage.rgem.io | —         |
+| prod  | ws.rgem.io       | api.rgem.io       | app.rgem.io       | rgem.io   |
 
 ## Code Conventions
 

@@ -709,6 +709,163 @@ Resources:
         EvaluateTargetHealth: false
 
 ###############################################################
+# Setup CloudFront distribution for the static landing page (prod only)
+  LandingBucket:
+    Type: AWS::S3::Bucket
+    Condition: IsProd
+    Properties:
+      BucketName: !Sub "${AWS::StackName}-landing-bucket"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  LandingBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Condition: IsProd
+    Properties:
+      Bucket: !Ref LandingBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowCloudFrontReadAccess
+            Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action:
+              - s3:GetObject
+            Resource: !Sub "${LandingBucket.Arn}/*"
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${LandingDistribution}"
+
+  LandingBucketOAC:
+    Type: AWS::CloudFront::OriginAccessControl
+    Condition: IsProd
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub "${AWS::StackName}-landing-oac"
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+        Description: !Sub "OAC for ${DomainBase}"
+
+  LandingWwwRedirectFunction:
+    Type: AWS::CloudFront::Function
+    Condition: IsProd
+    Properties:
+      Name: !Sub "${AWS::StackName}-www-redirect"
+      AutoPublish: true
+      FunctionConfig:
+        Comment: "Redirect www to apex"
+        Runtime: cloudfront-js-2.0
+      FunctionCode: |
+        function handler(event) {
+          var request = event.request;
+          var host = request.headers.host.value;
+          if (host.startsWith('www.')) {
+            return {
+              statusCode: 301,
+              statusDescription: 'Moved Permanently',
+              headers: {
+                location: { value: 'https://' + host.slice(4) + request.uri }
+              }
+            };
+          }
+          return request;
+        }
+
+  LandingDistribution:
+    Type: AWS::CloudFront::Distribution
+    Condition: IsProd
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: !Sub "Landing page for ${DomainBase}"
+        Aliases:
+          - !Ref DomainBase
+          - !Sub "www.${DomainBase}"
+        DefaultRootObject: "index.html"
+        Origins:
+          - Id: landing-origin
+            DomainName: !GetAtt LandingBucket.RegionalDomainName
+            S3OriginConfig: {}
+            OriginAccessControlId: !Ref LandingBucketOAC
+        DefaultCacheBehavior:
+          TargetOriginId: landing-origin
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: [GET, HEAD, OPTIONS]
+          CachedMethods: [GET, HEAD]
+          Compress: true
+          ForwardedValues:
+            QueryString: false
+            Cookies:
+              Forward: none
+          FunctionAssociations:
+            - EventType: viewer-request
+              FunctionARN: !GetAtt LandingWwwRedirectFunction.FunctionARN
+        ViewerCertificate:
+          AcmCertificateArn: !Ref CertificateArn
+          SslSupportMethod: sni-only
+          MinimumProtocolVersion: TLSv1.2_2021
+        CustomErrorResponses:
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: "/index.html"
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: "/index.html"
+
+  LandingAliasRecord:
+    Type: AWS::Route53::RecordSet
+    Condition: IsProd
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Sub "${DomainBase}."
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt LandingDistribution.DomainName
+        HostedZoneId: Z2FDTNDATAQYW2
+        EvaluateTargetHealth: false
+
+  LandingAliasRecordIPv6:
+    Type: AWS::Route53::RecordSet
+    Condition: IsProd
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Sub "${DomainBase}."
+      Type: AAAA
+      AliasTarget:
+        DNSName: !GetAtt LandingDistribution.DomainName
+        HostedZoneId: Z2FDTNDATAQYW2
+        EvaluateTargetHealth: false
+
+  WwwAliasRecord:
+    Type: AWS::Route53::RecordSet
+    Condition: IsProd
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Sub "www.${DomainBase}."
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt LandingDistribution.DomainName
+        HostedZoneId: Z2FDTNDATAQYW2
+        EvaluateTargetHealth: false
+
+  WwwAliasRecordIPv6:
+    Type: AWS::Route53::RecordSet
+    Condition: IsProd
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Sub "www.${DomainBase}."
+      Type: AAAA
+      AliasTarget:
+        DNSName: !GetAtt LandingDistribution.DomainName
+        HostedZoneId: Z2FDTNDATAQYW2
+        EvaluateTargetHealth: false
+
+###############################################################
 Outputs:
   ConnectionsTableArn:
     Description: "Connections table ARN"
@@ -779,3 +936,11 @@ Outputs:
   AppDistributionId:
     Value: !Ref AppDistribution
 
+  LandingBucketName:
+    Condition: IsProd
+    Description: "Name of the S3 bucket storing landing page assets."
+    Value: !Ref LandingBucket
+
+  LandingDistributionId:
+    Condition: IsProd
+    Value: !Ref LandingDistribution

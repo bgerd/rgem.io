@@ -24,7 +24,7 @@ The premise started with a question about physical proximity: the way shared obj
 
 ### Project status
 
-This is an active project. The web frontend and serverless backend are deployed and fully functional. The hardware component — a custom-built device using an [Adafruit NeoTrellis](https://www.adafruit.com/product/4352) keypad and [Feather M0 WiFi](https://www.adafruit.com/product/3010) (ATSAMD21 + ATWINC1500), modified with battery power — is manufactured and operational. The codebase can be read, reviewed, and understood as-is, but the repository is not yet self-contained enough to reproduce from scratch.
+This is an active project. The web frontend and serverless backend are deployed and fully functional. The hardware component — a custom-built device using an [Adafruit NeoTrellis](https://learn.adafruit.com/adafruit-neotrellis/overview) keypad and [Adafruit Feather M0 WiFi](https://www.adafruit.com/product/3010) (ATSAMD21 + ATWINC1500), modified with battery power — is manufactured and operational. The codebase can be read, reviewed, and understood as-is, but the repository is not yet self-contained enough to reproduce from scratch.
 
 **Known gaps for reproducibility:**
 
@@ -37,21 +37,23 @@ Contributions and questions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.m
 ## Architecture
 
 ```
-  Hardware (NeoTrellis)              App (React)
-         |                                |
-         |  HTTP POST                     |  WebSocket
-         v                                v
-       ┌──────────────────────────────────────┐
-       │         AWS Serverless Backend       │
-       │  Lambda  ·  API Gateway  ·  DynamoDB │
-       └──────────────────────────────────────┘
+                      Hardware                          RGem App  
+          (NeoTrellis + ATSAMD21 + ATWINC1500)          (React)
+                          |                                |
+                          |  WebSocket                     |  WebSocket
+                          v                                v
+                        ┌──────────────────────────────────────┐
+                        │         AWS Serverless Backend       │
+                        │  Lambda  ·  API Gateway  ·  DynamoDB │
+                        └──────────────────────────────────────┘
 ```
 
 The system has three components:
 
-- **App** (`app/`) — React + TypeScript + Vite web app. Connects to the backend over WebSocket, renders the 4x4 grid, and sends click/double-click events.
+- **RGem App** (`app/`) — React + TypeScript + Vite web app. Connects to the backend over WebSocket, renders the 4x4 grid, and sends click/double-click events.
+- **Landing Page** (`landing/`) — Static HTML page served at `rgem.io` (prod only). Links to the app.
 - **Backend** (`backend/` + `template.yaml`) — AWS SAM stack with WebSocket and HTTP API Gateways, Lambda functions (Node.js 20, ES modules), a shared Lambda layer, and two DynamoDB tables (connection tracking and grid state). Broadcasts state updates to all clients subscribed to the same "gem."
-- **Hardware** (`device/`) — Arduino sketch for an Adafruit NeoTrellis M4 (SAMD21). Connects to WiFi, communicates with the backend over WebSocket, and displays the shared grid state on its 4x4 RGB button matrix.
+- **Hardware** (`device/`) — Arduino sketch for an [Adafruit NeoTrellis](https://learn.adafruit.com/adafruit-neotrellis/overview) keypad and [Adafruit Feather M0 WiFi](https://www.adafruit.com/product/3010) (ATSAMD21 + ATWINC1500). Connects to WiFi, communicates with the backend over WebSocket, and displays the shared grid state on its 4x4 RGB button matrix.
 
 ### How It Works
 
@@ -65,9 +67,10 @@ The system has three components:
 
 | Component | Technologies |
 |-----------|-------------|
-| App       | React 19, TypeScript, Vite |
+| RGem App     | React 19, TypeScript, Vite |
+| Landing Page | Static HTML |
 | Backend   | AWS Lambda (Node.js 20), API Gateway (HTTP + WebSocket), DynamoDB, SAM/CloudFormation |
-| Hardware  | Arduino (SAMD21), Adafruit NeoTrellis, ArduinoJson |
+| Hardware  | [Adafruit NeoTrellis](https://learn.adafruit.com/adafruit-neotrellis/overview) keypad + [Adafruit Feather M0 WiFi](https://www.adafruit.com/product/3010) (ATSAMD21 + ATWINC1500) |
 
 ## Project Structure
 
@@ -86,6 +89,7 @@ The system has three components:
 ├── app/                        <-- React + TypeScript app SPA
 ├── device/                     <-- Arduino hardware sketches
 ├── infra/                      <-- deployment scripts
+├── landing/                    <-- static landing page (prod: rgem.io)
 ├── samconfig.toml.example      <-- SAM CLI environment config template (copy to samconfig.toml)
 └── template.yaml               <-- SAM template for Lambda + DynamoDB
 ```
@@ -100,7 +104,7 @@ The system has three components:
 - [Python 3](https://www.python.org/) (required by SAM CLI)
 - [Arduino IDE](https://www.arduino.cc/en/software) (for hardware development only)
 
-Three environments `dev`, `stage`, `prod` with their own CloudFormation stacks (E.g. `rgem-dev`, `rgem-stage` and `rgem-prod`) are defined by `samconfig.toml`.
+Three environments `dev`, `stage`, `prod` with their own CloudFormation stacks (e.g. `rgem-dev`, `rgem-stage` and `rgem-prod`) are defined by `samconfig.toml`.
 
 ## Deployment Steps
 
@@ -125,6 +129,12 @@ Run once after cloning (or to switch environments):
 
 This generates gitignored config files (`.env`, `app/.env`, `device/core/config.h`) that all other scripts and builds consume.
 
+> **Picking the project back up?** All deploy scripts read `RGEM_ENV` from `.env`. Check which environment is currently stamped before running anything:
+> ```bash
+> cat .env
+> ```
+> If it's wrong, re-run `./configure.sh <env>` before proceeding.
+
 #### 3. Lint
 ```bash
 sam validate --lint
@@ -138,13 +148,19 @@ sam validate --lint
 
 > **Note:** If the structure of `gemState` changes, you must clear the `GEM_STATE_TABLE` in DynamoDB before deploying.
 
-#### 5. Deploy app
+#### 5. Deploy RGem App
 
 ```bash
 ./infra/scripts/deploy-app.sh
 ```
 
-#### 6. Tear down an environment (optional)
+#### 6. Deploy landing page (prod only)
+
+```bash
+./infra/scripts/deploy-landing.sh
+```
+
+#### 7. Tear down an environment (optional)
 
 To delete all AWS resources for an environment and start fresh:
 
@@ -152,24 +168,25 @@ To delete all AWS resources for an environment and start fresh:
 ./infra/scripts/force-delete-stack.sh
 ```
 
-This empties S3 buckets, disables CloudFront, and deletes the CloudFormation stack. It reads the target environment from `.env` (set by `configure.sh`). After deletion completes, you can redeploy with steps 4 and 5.
+This empties S3 buckets, disables CloudFront, and deletes the CloudFormation stack. It reads the target environment from `.env` (set by `configure.sh`). After deletion completes, you can redeploy with steps 4, 5, and (for prod) 6.
 
 # Testing
 
-## App
+## RGem App
+
 Navigate your browser to
 - Dev: [app-dev.rgem.io](app-dev.rgem.io)
 - Stage: [app-stage.rgem.io](app-stage.rgem.io)
 - Prod: [app.rgem.io](app.rgem.io)
 
-## App (Unit Tests)
+## RGem App (Unit Tests)
 
 ```bash
 cd app
 npm run test
 ```
 
-## App (Local)
+## RGem App (Local)
 
 After running `./configure.sh <env>`, `app/.env` is generated with the correct `VITE_WS_URL`. Start the dev server:
 
@@ -182,11 +199,15 @@ Then open a browser to http://localhost:5173/
 
 Remember that in **React Strict Mode** components intentionally render twice in **development mode** to help find accidental side-effects and ensure components are resilient to being mounted and unmounted.
 
-So that when running locally: we expect an initial WebSocket connection to fail, because it is closed before the connection is established 
+So when running locally, we expect an initial WebSocket connection to fail, because it is closed before the connection is established.
+
+## Landing Page
+
+Navigate to [rgem.io](https://rgem.io) (prod only). `www.rgem.io` should redirect to `rgem.io`.
 
 ## Backend
 
-The rgempad API has two seperate ``ApiGateways``, one for `HTTP` connections (E.g. `RGempadHttpApi`) and another for `WEBSOCKET` connections (E.g. `RGempadWSApi`) per Environment / CloudFormation Stack.
+The rgempad API has two separate `ApiGateways`, one for `HTTP` connections (e.g. `RGempadHttpApi`) and another for `WEBSOCKET` connections (e.g. `RGempadWSApi`) per environment / CloudFormation stack.
 
 To test the WebSocket API, you can use [wscat](https://github.com/websockets/wscat), an open-source command line tool.
 
@@ -215,7 +236,7 @@ Note that an app-level ping is distinct from a protocol/control-level ping.
 - RGEM pad devices only send control-level pings, which are handled by the API Gateway
 
 #### 4.b. To test the **hello** function, send the following JSON messages over a connected websocket. 
-The connection will then be subscribed to  `<gemId>` and it will immediately receive its current state.
+The connection will then be subscribed to `<gemId>` and it will immediately receive its current state.
 
 ```
 > { "type": "hello", "gemId": "<gemId>" }
@@ -223,7 +244,7 @@ The connection will then be subscribed to  `<gemId>` and it will immediately rec
 ```
 Note: `gemState` is a base64-encoded 48-byte payload representing 16 RGB triplets (16×3 bytes). `ts` is a base64-encoded 8-byte Big-Endian timestamp (milliseconds since epoch) used by clients to discard out-of-order updates.
 
-#### 4.c. To test **toggle** websocket function send the following JSON messages over a connected websocket subscribed to `<gemId>`
+#### 4.c. To test the **toggle** WebSocket function, send the following JSON messages over a connected WebSocket subscribed to `<gemId>`
 
 ```
 > { "type": "toggle", "e": "keydown", "num": 0 }
@@ -244,7 +265,7 @@ All connected websockets subscribed to `<gemId>` should immediately receive the 
 < { "type":"hb" }
 ```
 
-#### 6. To test the **gempost** HTTP function, while connected and subscribed to `<gemID>` via `wscat` as show above, in a seperate terminal POST a JSON message like the following example 
+#### 6. To test the **gempost** HTTP function, while connected and subscribed to `<gemID>` via `wscat` as shown above, in a separate terminal POST a JSON message like the following example:
 
 ```
 # dev rest_api_host: api-dev.rgem.io
