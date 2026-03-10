@@ -75,16 +75,17 @@ Resources:
 
   #######
   RGempadHttpApiDeployment:
-    # NOTE: Remember that Deployments are immutable, so ANY change to routes or
-    # integrations requires a new deployment! Worst case to force a new deployment
-    # delete the stack and re-create it  
+    # NOTE: Deployments are immutable snapshots. CloudFormation only replaces this
+    # resource when one of its own properties changes. Bump `Description` (rev: N)
+    # whenever you modify a route key, integration URI, or RouteSelectionExpression —
+    # otherwise API Gateway will not pick up the change even though Lambda is updated.
+    # NOTE: `DependsOn` controls creation order only; it does NOT trigger re-deployment.
     Type: AWS::ApiGatewayV2::Deployment
-    # NOTE: `DependsOn` concerns order of resource creation, ensure all routes and
-    # integrations are created before deployment. It does NOT compel re-deployment
     DependsOn:
       - GemPostRoute
     Properties:
       ApiId: !Ref RGempadHttpApi
+      Description: "rev: 1"
 
   #######
   RGempadHttpApiStage:
@@ -175,12 +176,12 @@ Resources:
 
 #######
   RGempadWSApiDeployment:
-    # NOTE: Remember that Deployments are immutable, so ANY change to routes or
-    # integrations requires a new deployment! Worst case to force a new deployment
-    # delete the stack and re-create it
+    # NOTE: Deployments are immutable snapshots. CloudFormation only replaces this
+    # resource when one of its own properties changes. Bump `Description` (rev: N)
+    # whenever you modify a route key, integration URI, or RouteSelectionExpression —
+    # otherwise API Gateway will not pick up the change even though Lambda is updated.
+    # NOTE: `DependsOn` controls creation order only; it does NOT trigger re-deployment.
     Type: AWS::ApiGatewayV2::Deployment
-    # NOTE: `DependsOn` concerns order of resource creation, ensure all routes and
-    # integrations are created before deployment. It does NOT compel re-deployment
     DependsOn:
       - HelloRoute
       - HelloInteg
@@ -192,6 +193,7 @@ Resources:
       - DisconnectInteg
     Properties:
       ApiId: !Ref RGempadWSApi
+      Description: "rev: 1"
 
 #######
   RGempadWSApiStage:

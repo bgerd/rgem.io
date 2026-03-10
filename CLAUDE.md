@@ -53,6 +53,20 @@ Compile and upload via Arduino IDE.
 | stage | ws-stage.rgem.io | api-stage.rgem.io | app-stage.rgem.io | —         |
 | prod  | ws.rgem.io       | api.rgem.io       | app.rgem.io       | rgem.io   |
 
+## Branch Strategy
+
+| Branch  | Environment | Deployed via                  |
+|---------|-------------|-------------------------------|
+| `main`  | dev         | manual after PR merge         |
+| `stage` | stage       | manual after `main → stage` PR |
+| `prod`  | prod        | manual after `stage → prod` PR |
+
+Changes flow one direction: `main → stage → prod`. Never push directly to `stage` or `prod`.
+
+**Hotfixes** (including all Landing Page changes): cut `hotfix/*` from `prod`, PR into `prod`, then mandatory back-merge PR into `main`.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full workflow.
+
 ## Code Conventions
 
 ### Backend (Node.js 20)
@@ -93,7 +107,8 @@ Compile and upload via Arduino IDE.
 
 - React Strict Mode double-renders in dev; first WebSocket connection will fail (expected)
 - `gemState` is a 16-element int array (0 = off, 1-8 = color positions), encoded as base64 (48 bytes = 16 cells x 3 RGB bytes) over the wire
-- If the structure of `gemState` changes, you must clear the `GEM_STATE_TABLE` in DynamoDB before deploying
+- If the structure of `gemState` changes, clear both DynamoDB tables before deploying: `./infra/scripts/clear-tables.sh`
+- API Gateway `Deployment` resources are immutable — bump `Description: "rev: N"` in `template.yaml` on any route/integration change or API Gateway will ignore it. See README.md Infrastructure Operations.
 - Shared Lambda layer lives at `backend/layers/common/nodejs/` — contains DDB client, WS client, gem-state encoding, and broadcast utility
 - `backend/update-dependencies.sh` updates node_modules across all handlers
 

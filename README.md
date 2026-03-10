@@ -170,6 +170,65 @@ To delete all AWS resources for an environment and start fresh:
 
 This empties S3 buckets, disables CloudFront, and deletes the CloudFormation stack. It reads the target environment from `.env` (set by `configure.sh`). After deletion completes, you can redeploy with steps 4, 5, and (for prod) 6.
 
+# Infrastructure Operations
+
+Not all changes to `template.yaml` behave the same way in CloudFormation. Use the table below to choose the right action before deploying.
+
+## Change Decision Table
+
+| Change type | Action required | Commands |
+|---|---|---|
+| Lambda code, env vars, memory/timeout | `sam deploy` only | `deploy-backend.sh` |
+| IAM policies, CloudFront cache/error settings | `sam deploy` only | `deploy-backend.sh` |
+| API Gateway route or integration changes | Bump `Description` rev in `template.yaml` + `sam deploy` | edit `template.yaml` → `deploy-backend.sh` |
+| API Gateway `RouteSelectionExpression` | Full stack tear-down | `force-delete-stack.sh` → redeploy ¹ |
+| `gemState` encoding or structure change | Clear tables → `sam deploy` | `clear-tables.sh` → `deploy-backend.sh` |
+| DynamoDB primary key change (`gemId`, `connectionId`) | Full stack tear-down | `force-delete-stack.sh` → redeploy ¹ |
+| S3 bucket name change | Full stack tear-down | `force-delete-stack.sh` → redeploy ¹ |
+
+> ¹ After tear-down, follow [Deployment Steps](#deployment-steps) to redeploy backend, app, and (for prod) landing page.
+
+## API Gateway: Forcing a New Deployment
+
+`AWS::ApiGatewayV2::Deployment` resources are immutable snapshots. CloudFormation will **not** automatically create a new deployment when routes or integrations change — it only does so when the `Deployment` resource's own properties change.
+
+**Rule:** whenever you modify a route key, integration URI, or `RouteSelectionExpression` in `template.yaml`, increment the `Description` field on the affected `Deployment` resource before running `sam deploy`:
+
+```yaml
+# Before
+Description: "rev: 1"
+
+# After any route or integration change
+Description: "rev: 2"
+```
+
+This applies to both `RGempadHttpApiDeployment` and `RGempadWSApiDeployment`. Skipping this step means Lambda receives the updated code but API Gateway continues routing to the old integration.
+
+## Clearing DynamoDB Tables
+
+Required when the `gemState` encoding or structure changes (see Key Gotchas in CLAUDE.md), or when you want a clean slate without tearing down the stack.
+
+```bash
+./infra/scripts/clear-tables.sh
+```
+
+This clears both `GEM_STATE_TABLE` (gem state) and `CONNECTIONS_TABLE` (active WebSocket connections). Connected clients will be dropped and will reconnect automatically.
+
+## Full Stack Tear-Down
+
+Required when CloudFormation must **replace** a resource that cannot be updated in-place: DynamoDB primary key changes, `RouteSelectionExpression` changes, S3 bucket name changes, or a stack stuck in a rollback state.
+
+```bash
+./infra/scripts/force-delete-stack.sh
+```
+
+`force-delete-stack.sh` handles the two preconditions that cause a normal `cloudformation delete-stack` to fail:
+
+1. **Non-empty S3 buckets** — CloudFormation cannot delete them; the script empties them first.
+2. **Enabled CloudFront distributions** — CloudFormation cannot delete them; the script disables each distribution and waits for propagation before proceeding.
+
+After deletion, redeploy from scratch using steps 4–6 in the [Deployment Steps](#deployment-steps) section above.
+
 # Testing
 
 ## RGem App
