@@ -185,7 +185,7 @@ Not all changes to `template.yaml` behave the same way in CloudFormation. Use th
 | API Gateway `RouteSelectionExpression` | Full stack tear-down | `force-delete-stack.sh` → redeploy ¹ |
 | `gemState` encoding or structure change | Clear tables → `sam deploy` | `clear-tables.sh` → `deploy-backend.sh` |
 | DynamoDB primary key change (`gemId`, `connectionId`) | Full stack tear-down | `force-delete-stack.sh` → redeploy ¹ |
-| S3 bucket name change | Full stack tear-down | `force-delete-stack.sh` → redeploy ¹ |
+| S3 bucket name change | Manually empty old bucket → Full stack tear-down | `force-delete-stack.sh` → redeploy ¹ |
 
 > ¹ After tear-down, follow [Deployment Steps](#deployment-steps) to redeploy backend, app, and (for prod) landing page.
 

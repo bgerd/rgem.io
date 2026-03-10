@@ -3,54 +3,432 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>rgem.io</title>
+  <title>rgem.io — A shared light you can touch from anywhere.</title>
+  <meta name="description" content="Sixteen colored cells. Synchronized in real time. Tap a cell on your phone and watch it change on every other connected screen — instantly." />
+
+  <!-- Fonts: Cormorant Garamond (display) + DM Sans (body) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+
   <style>
+    /* ─────────────────────────────────────────
+       Design tokens
+    ───────────────────────────────────────── */
+    :root {
+      --bg:           #080d18;
+      --surface:      #1e293b;
+      --border:       rgba(255,255,255,0.07);
+      --blue:         #3b82f6;
+      --blue-glow:    rgba(59,130,246,0.35);
+      --blue-hover:   #5b9cf8;
+      --text:         #f1f5f9;
+      --muted:        rgba(241,245,249,0.42);
+      --very-muted:   rgba(241,245,249,0.22);
+      --font-display: 'Cormorant Garamond', Georgia, serif;
+      --font-body:    'DM Sans', system-ui, sans-serif;
+    }
+
+    /* ─────────────────────────────────────────
+       Reset & base
+    ───────────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      background: #0d0d0d;
-      color: #e8e8e8;
-      font-family: system-ui, -apple-system, sans-serif;
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-body);
+      font-size: 16px;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ─────────────────────────────────────────
+       Ambient background — slow drifting radial
+    ───────────────────────────────────────── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      /* two soft radial clouds that animate independently */
+      background:
+        radial-gradient(ellipse 55% 45% at 30% 60%, rgba(59,130,246,0.07) 0%, transparent 70%),
+        radial-gradient(ellipse 40% 50% at 72% 30%, rgba(99,170,255,0.05) 0%, transparent 65%);
+      animation: ambientDrift 18s ease-in-out infinite alternate;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    @keyframes ambientDrift {
+      0%   { opacity: 0.6; transform: scale(1)   translate(0,    0); }
+      50%  { opacity: 1;   transform: scale(1.04) translate(-1%,  1%); }
+      100% { opacity: 0.7; transform: scale(0.97) translate(1.5%, -1%); }
+    }
+
+    /* ─────────────────────────────────────────
+       Layout
+    ───────────────────────────────────────── */
+    .stage {
+      position: relative;
+      z-index: 1;
       min-height: 100vh;
       display: flex;
       align-items: center;
       justify-content: center;
-      text-align: center;
-      padding: 2rem;
+      padding: 3rem 1.5rem;
     }
-    .container { max-width: 480px; }
-    h1 {
-      font-size: 3rem;
-      font-weight: 700;
-      letter-spacing: -0.02em;
-      margin-bottom: 1rem;
+
+    .card {
+      width: 100%;
+      max-width: 560px;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
     }
-    p {
-      font-size: 1.125rem;
-      color: #999;
-      line-height: 1.6;
-      margin-bottom: 2rem;
+
+    /* ─────────────────────────────────────────
+       Wordmark / headline
+    ───────────────────────────────────────── */
+    .wordmark {
+      font-family: var(--font-display);
+      font-weight: 300;
+      font-size: clamp(3rem, 8vw, 5rem);
+      letter-spacing: -0.01em;
+      line-height: 1;
+      color: var(--text);
+      /* subtle text-glow on the dot */
+      text-shadow: 0 0 40px rgba(59,130,246,0.18);
+      opacity: 0;
+      transform: translateY(10px);
+      animation: fadeUp 0.9s cubic-bezier(0.22,1,0.36,1) 0.1s forwards;
     }
-    a.cta {
-      display: inline-block;
-      background: #e8e8e8;
-      color: #0d0d0d;
-      font-size: 1rem;
-      font-weight: 600;
-      padding: 0.75rem 2rem;
-      border-radius: 6px;
+
+    /* ─────────────────────────────────────────
+       Tagline
+    ───────────────────────────────────────── */
+    .tagline {
+      margin-top: 1.1rem;
+      font-family: var(--font-display);
+      font-weight: 300;
+      font-size: clamp(1.05rem, 2.5vw, 1.3rem);
+      color: var(--muted);
+      letter-spacing: 0.01em;
+      line-height: 1.5;
+      opacity: 0;
+      transform: translateY(10px);
+      animation: fadeUp 0.9s cubic-bezier(0.22,1,0.36,1) 0.28s forwards;
+    }
+
+    /* ─────────────────────────────────────────
+       Mini grid — animated hint of the product
+    ───────────────────────────────────────── */
+    .grid-hint {
+      margin-top: 2.6rem;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+      width: 120px;
+      opacity: 0;
+      animation: fadeUp 0.9s cubic-bezier(0.22,1,0.36,1) 0.44s forwards;
+    }
+
+    .cell {
+      aspect-ratio: 1;
+      border-radius: 5px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      transition: background 0.6s ease, box-shadow 0.6s ease;
+    }
+
+    /* cells that are "lit" get a color + glow */
+    .cell.lit {
+      box-shadow: 0 0 10px 1px currentColor;
+    }
+
+    /* ─────────────────────────────────────────
+       Description block
+    ───────────────────────────────────────── */
+    .description {
+      margin-top: 2.8rem;
+      font-size: 0.925rem;
+      font-weight: 300;
+      color: var(--muted);
+      line-height: 1.75;
+      max-width: 420px;
+      opacity: 0;
+      transform: translateY(8px);
+      animation: fadeUp 0.9s cubic-bezier(0.22,1,0.36,1) 0.58s forwards;
+    }
+
+    /* ─────────────────────────────────────────
+       Divider
+    ───────────────────────────────────────── */
+    .divider {
+      margin-top: 2.6rem;
+      height: 1px;
+      background: var(--border);
+      opacity: 0;
+      animation: fadeIn 0.9s ease 0.72s forwards;
+    }
+
+    /* ─────────────────────────────────────────
+       "Try it yourself" section
+    ───────────────────────────────────────── */
+    .try-heading {
+      margin-top: 2rem;
+      font-size: 0.7rem;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--very-muted);
+      opacity: 0;
+      animation: fadeIn 0.9s ease 0.82s forwards;
+    }
+
+    .steps {
+      margin-top: 1.1rem;
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+      opacity: 0;
+      animation: fadeIn 0.9s ease 0.94s forwards;
+    }
+
+    .steps li {
+      display: flex;
+      align-items: baseline;
+      gap: 0.85rem;
+      font-size: 0.875rem;
+      font-weight: 300;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .step-num {
+      flex-shrink: 0;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.65rem;
+      font-weight: 500;
+      color: var(--very-muted);
+      letter-spacing: 0;
+      line-height: 1;
+      margin-top: 1px; /* optical baseline align */
+    }
+
+    .steps li code {
+      font-family: 'DM Mono', 'Fira Mono', monospace;
+      font-size: 0.8rem;
+      background: rgba(59,130,246,0.1);
+      color: rgba(147,197,253,0.9);
+      padding: 1px 6px;
+      border-radius: 4px;
+      border: 1px solid rgba(59,130,246,0.18);
+      white-space: nowrap;
+    }
+
+    /* ─────────────────────────────────────────
+       CTA button
+    ───────────────────────────────────────── */
+    .cta-wrap {
+      margin-top: 2.4rem;
+      opacity: 0;
+      animation: fadeUp 0.9s cubic-bezier(0.22,1,0.36,1) 1.08s forwards;
+    }
+
+    .cta {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      background: var(--blue);
+      color: #fff;
+      font-family: var(--font-body);
+      font-size: 0.9rem;
+      font-weight: 500;
+      letter-spacing: 0.01em;
       text-decoration: none;
-      transition: background 0.15s;
+      padding: 0.7rem 1.4rem;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      box-shadow: 0 0 24px var(--blue-glow), 0 2px 8px rgba(0,0,0,0.4);
+      transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
+      will-change: transform;
     }
-    a.cta:hover { background: #fff; }
+
+    .cta:hover {
+      background: var(--blue-hover);
+      box-shadow: 0 0 36px rgba(91,156,248,0.5), 0 2px 12px rgba(0,0,0,0.5);
+      transform: translateY(-1px);
+    }
+
+    .cta:active {
+      transform: translateY(0px);
+      box-shadow: 0 0 20px var(--blue-glow);
+    }
+
+    .cta-arrow {
+      font-size: 1rem;
+      line-height: 1;
+      transition: transform 0.2s ease;
+    }
+
+    .cta:hover .cta-arrow { transform: translateX(3px); }
+
+    /* ─────────────────────────────────────────
+       Shared animations
+    ───────────────────────────────────────── */
+    @keyframes fadeUp {
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes fadeIn {
+      to { opacity: 1; }
+    }
+
+    /* ─────────────────────────────────────────
+       Mobile tweaks
+    ───────────────────────────────────────── */
+    @media (max-width: 480px) {
+      .stage { padding: 2.5rem 1.25rem; align-items: flex-start; padding-top: 15vh; }
+      .description { max-width: 100%; }
+    }
   </style>
 </head>
 <body>
-  <div id="root">
-    <div class="container">
-      <h1>rgem.io</h1>
-      <p>A shared light you can touch from anywhere.</p>
-      <a class="cta" href="https://app.rgem.io">Try it now &rarr;</a>
-    </div>
+
+  <div class="stage">
+    <main class="card" role="main">
+
+      <!-- Wordmark -->
+      <h1 class="wordmark">rgem.io</h1>
+
+      <!-- Tagline -->
+      <p class="tagline">A shared light you can touch from anywhere.</p>
+
+      <!-- Animated mini-grid: a silent nod to the product -->
+      <div class="grid-hint" aria-hidden="true" id="miniGrid">
+        <!-- 16 cells injected by JS -->
+      </div>
+
+      <!-- Description -->
+      <p class="description">
+        Sixteen colored cells. Synchronized in real time.
+        Tap a cell on your phone and watch it change on every other
+        connected screen&nbsp;— instantly.
+      </p>
+
+      <!-- Divider -->
+      <div class="divider" role="separator"></div>
+
+      <!-- How to try it -->
+      <p class="try-heading">Try it yourself</p>
+
+      <ol class="steps">
+        <li>
+          <span class="step-num">1</span>
+          <span>Open <code>app.rgem.io</code> on this device</span>
+        </li>
+        <li>
+          <span class="step-num">2</span>
+          <span>Open it again in a second browser window — or on your phone</span>
+        </li>
+        <li>
+          <span class="step-num">3</span>
+          <span>Select <code>default</code> from the dropdown in both, and hit&nbsp;Connect</span>
+        </li>
+        <li>
+          <span class="step-num">4</span>
+          <span>Tap any cell. Watch the other window.</span>
+        </li>
+      </ol>
+
+      <!-- CTA -->
+      <div class="cta-wrap">
+        <a class="cta" href="https://app.rgem.io" target="_blank" rel="noopener noreferrer">
+          Try the demo
+          <span class="cta-arrow" aria-hidden="true">→</span>
+        </a>
+      </div>
+
+    </main>
   </div>
+
+  <script>
+    // ─────────────────────────────────────────
+    // Mini-grid ambient animation
+    // Slowly pulses random cells with muted hues,
+    // simulating a live but quiet shared grid.
+    // ─────────────────────────────────────────
+
+    const COLORS = [
+      { color: '#3b82f6', glow: 'rgba(59,130,246,0.6)'  },  // blue
+      { color: '#6366f1', glow: 'rgba(99,102,241,0.55)' },  // indigo
+      { color: '#0ea5e9', glow: 'rgba(14,165,233,0.55)' },  // sky
+      { color: '#8b5cf6', glow: 'rgba(139,92,246,0.5)'  },  // violet
+      { color: '#06b6d4', glow: 'rgba(6,182,212,0.5)'   },  // cyan
+    ];
+
+    const grid = document.getElementById('miniGrid');
+
+    // Build 16 cells
+    const cells = Array.from({ length: 16 }, (_, i) => {
+      const el = document.createElement('div');
+      el.className = 'cell';
+      grid.appendChild(el);
+      return el;
+    });
+
+    // Track which cells are currently lit
+    const litSet = new Set();
+
+    function lightCell() {
+      // Pick a random unlit cell (prefer unlit for variety)
+      const unlit = cells.filter((_, i) => !litSet.has(i));
+      const pool  = unlit.length > 2 ? unlit : cells; // fallback to all if too few
+      const idx   = cells.indexOf(pool[Math.floor(Math.random() * pool.length)]);
+      const c     = COLORS[Math.floor(Math.random() * COLORS.length)];
+      const el    = cells[idx];
+
+      litSet.add(idx);
+      el.classList.add('lit');
+      el.style.background   = c.color;
+      el.style.color        = c.glow;   // used by box-shadow currentColor
+      el.style.borderColor  = 'transparent';
+
+      // Fade it out after a beat
+      const holdMs  = 1400 + Math.random() * 1800;
+      const fadeMs  = 700;
+
+      setTimeout(() => {
+        // Transition back to default
+        el.style.background  = '';
+        el.style.color       = '';
+        el.style.borderColor = '';
+        el.classList.remove('lit');
+        setTimeout(() => litSet.delete(idx), fadeMs);
+      }, holdMs);
+    }
+
+    // Fire first light after page settles, then keep a slow rhythm
+    function scheduleNext() {
+      const delay = 600 + Math.random() * 1000;
+      setTimeout(() => {
+        lightCell();
+        scheduleNext();
+      }, delay);
+    }
+
+    // Start after the grid has faded in
+    setTimeout(scheduleNext, 1400);
+  </script>
+
 </body>
 </html>
