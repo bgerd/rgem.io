@@ -16,9 +16,9 @@ sam validate --lint
 sam build && sam deploy --config-env dev   # or stage, prod
 ```
 
-### Frontend
+### App
 ```bash
-cd frontend
+cd app
 export VITE_WS_URL=wss://ws-dev.rgem.io
 npm run dev          # localhost:5173
 npm run build        # Production build (includes tsc -b)
@@ -26,9 +26,9 @@ npm run lint         # ESLint
 npm run test         # Vitest unit tests
 ```
 
-### Deploy Frontend
+### Deploy App
 ```bash
-./infra/scripts/deploy-frontend.sh dev   # S3 + CloudFront invalidation
+./infra/scripts/deploy-app.sh   # S3 + CloudFront invalidation
 ```
 
 ### Hardware
@@ -36,11 +36,11 @@ Compile and upload via Arduino IDE.
 
 ## Environments
 
-| Env   | WebSocket        | HTTP API         | Frontend        |
-|-------|------------------|------------------|-----------------|
-| dev   | ws-dev.rgem.io   | api-dev.rgem.io  | app-dev.rgem.io |
-| stage | ws-stage.rgem.io | api-stage.rgem.io| app-stage.rgem.io|
-| prod  | ws.rgem.io       | api.rgem.io      | app.rgem.io     |
+| Env   | WebSocket        | HTTP API          | App               |
+|-------|------------------|-------------------|-------------------|
+| dev   | ws-dev.rgem.io   | api-dev.rgem.io   | app-dev.rgem.io   |
+| stage | ws-stage.rgem.io | api-stage.rgem.io | app-stage.rgem.io |
+| prod  | ws.rgem.io       | api.rgem.io       | app.rgem.io       |
 
 ## Code Conventions
 
@@ -51,7 +51,7 @@ Compile and upload via Arduino IDE.
 - camelCase variables/functions, UPPER_CASE constants
 - No linting configured
 
-### Frontend (TypeScript / React 19)
+### App (TypeScript / React 19)
 - Strict TypeScript, no `any`
 - Functional components with hooks, Context API for state
 - PascalCase components/types, camelCase variables/functions
@@ -106,9 +106,9 @@ HTTP POST `/gem/{gemId}`: body is int array `[0,1,2,...,7]` (16 elements, values
 
 ## Testing
 
-### Frontend (Unit)
+### App (Unit)
 ```bash
-cd frontend
+cd app
 npm run test         # Vitest (28 tests across gem-state, color utilities)
 ```
 

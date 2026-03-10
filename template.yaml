@@ -478,11 +478,11 @@ Resources:
       Principal: apigateway.amazonaws.com
 
 ###############################################################
-# Setup CloudFront distribution for static website hosting of frontend React SPA
-  FrontendBucket:
+# Setup CloudFront distribution for static website hosting of the app SPA
+  AppBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub "${AWS::StackName}-frontend-bucket"
+      BucketName: !Sub "${AWS::StackName}-app-bucket"
       # Enforce bucket to block all public access
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
@@ -491,10 +491,10 @@ Resources:
         RestrictPublicBuckets: true
   
   # Grant CloudFront access to read from the S3 bucket
-  FrontendBucketPolicy:
+  AppBucketPolicy:
     Type: AWS::S3::BucketPolicy
     Properties:
-      Bucket: !Ref FrontendBucket
+      Bucket: !Ref AppBucket
       PolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -504,29 +504,29 @@ Resources:
               Service: cloudfront.amazonaws.com
             Action:
               - s3:GetObject
-            Resource: !Sub "${FrontendBucket.Arn}/*"
+            Resource: !Sub "${AppBucket.Arn}/*"
             Condition:
               StringEquals:
                 # Only this distribution can use the OAC to access the bucket
-                AWS:SourceArn: !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${FrontendDistribution}"
+                AWS:SourceArn: !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${AppDistribution}"
 
   # Requires CloudFront to sign and identify its requests to the S3 bucket
-  FrontendBucketOAC:
+  AppBucketOAC:
     Type: AWS::CloudFront::OriginAccessControl
     Properties:
       OriginAccessControlConfig:
-        Name: !Sub "${AWS::StackName}-frontend-oac"
+        Name: !Sub "${AWS::StackName}-app-oac"
         OriginAccessControlOriginType: s3
         SigningBehavior: always
         SigningProtocol: sigv4
         Description: !Sub "OAC for app-${EnvName}.${DomainBase}"
 
-  FrontendDistribution:
+  AppDistribution:
     Type: AWS::CloudFront::Distribution
     Properties:
       DistributionConfig:
         Enabled: true
-        Comment: !Sub "Frontend for app-${EnvName}.${DomainBase}"
+        Comment: !Sub "App for app-${EnvName}.${DomainBase}"
         # Note: Authorizes the distribution to accept requests for these domain names
         Aliases: 
           - !If
@@ -535,19 +535,19 @@ Resources:
             - !Sub "app-${EnvName}.${DomainBase}"
         DefaultRootObject: "index.html"
         Origins:
-          - Id: !Sub "frontend-origin-${EnvName}"
+          - Id: !Sub "app-origin-${EnvName}"
             # Note: An S3 bucket’s RegionalDomainName is the AWS-provided DNS hostname
             #       for that bucket’s REST endpoint in its specific region. It combines
             #       your bucket name with an AWS-controlled regional suffix
             #       (e.g. <bucketname>.s3.<region>.amazonaws.com) and is the recommended value to
             #       use as a CloudFront origin.
-            DomainName: !GetAtt FrontendBucket.RegionalDomainName
+            DomainName: !GetAtt AppBucket.RegionalDomainName
             S3OriginConfig: {}  # Required but empty when using OAC
-            OriginAccessControlId: !Ref FrontendBucketOAC
+            OriginAccessControlId: !Ref AppBucketOAC
 
         # CDN Cache behavior settings
         DefaultCacheBehavior:
-          TargetOriginId: !Sub "frontend-origin-${EnvName}"
+          TargetOriginId: !Sub "app-origin-${EnvName}"
           # Note: Redirect all HTTP requests to HTTPS
           ViewerProtocolPolicy: redirect-to-https
           AllowedMethods: [GET, HEAD, OPTIONS]
@@ -672,7 +672,7 @@ Resources:
         HostedZoneId: !GetAtt WebSocketApiDomainName.RegionalHostedZoneId
         EvaluateTargetHealth: false
 
-  FrontendAliasRecord:
+  AppAliasRecord:
     Type: AWS::Route53::RecordSet
     Properties:
       HostedZoneId: !Ref HostedZoneId
@@ -686,11 +686,11 @@ Resources:
         #       DNS name (*.cloudfront.net), and all such names live in the same
         #       AWS-owned Route 53 hosted zone (Z2FDTNDATAQYW2).
         # see: https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-properties-route53-recordset-aliastarget.html
-        DNSName: !GetAtt FrontendDistribution.DomainName
+        DNSName: !GetAtt AppDistribution.DomainName
         HostedZoneId: Z2FDTNDATAQYW2
         EvaluateTargetHealth: false
 
-  FrontendAliasRecordIPv6:
+  AppAliasRecordIPv6:
     Type: AWS::Route53::RecordSet
     Properties:
       HostedZoneId: !Ref HostedZoneId
@@ -704,7 +704,7 @@ Resources:
         #       DNS name (*.cloudfront.net), and all such names live in the same
         #       AWS-owned Route 53 hosted zone (Z2FDTNDATAQYW2).
         # see: https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-properties-route53-recordset-aliastarget.html
-        DNSName: !GetAtt FrontendDistribution.DomainName
+        DNSName: !GetAtt AppDistribution.DomainName
         HostedZoneId: Z2FDTNDATAQYW2
         EvaluateTargetHealth: false
 
@@ -768,13 +768,14 @@ Outputs:
         ],
       ]
 
-  FrontendBucketName:
-    Description: "Name of the S3 bucket storing frontend assets."
-    Value: !Ref FrontendBucket
+  AppBucketName:
+    Description: "Name of the S3 bucket storing app assets."
+    Value: !Ref AppBucket
 
-  FrontendDomainName:
-    Description: "Public URL for this environment's frontend SPA."
+  AppDomainName:
+    Description: "Public URL for this environment's app SPA."
     Value: !Sub "https://app-${EnvName}.${DomainBase}" 
 
-  FrontendDistributionId:
-    Value: !Ref FrontendDistribution
+  AppDistributionId:
+    Value: !Ref AppDistribution
+

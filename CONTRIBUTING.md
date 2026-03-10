@@ -17,16 +17,16 @@ Thanks for your interest in contributing! This document covers how to get starte
    ./configure.sh dev
    ```
 
-3. **Install frontend dependencies**
+3. **Install app dependencies**
    ```bash
-   cd frontend
+   cd app
    npm install
    ```
 
 ## Running Locally
 
 ```bash
-cd frontend
+cd app
 npm run dev       # Dev server at localhost:5173
 npm run lint      # ESLint
 npm run test      # Vitest unit tests
@@ -47,16 +47,16 @@ Follow the existing format: `type:scope: description`
 
 Examples:
 ```
-fix:frontend: correct lint issues
-refactor:frontend: extract standalone functions to src/lib
-build:frontend: install vitest and implement basic tests
+fix:app: correct lint issues
+refactor:app: extract standalone functions to src/lib
+build:app: install vitest and implement basic tests
 ```
 
 ## Pull Requests
 
 1. Fork the repo and create a feature branch from `main`
 2. Make your changes, following the code conventions above
-3. Ensure `npm run lint` and `npm run test` pass in `frontend/`
+3. Ensure `npm run lint` and `npm run test` pass in `app/`
 4. Open a PR against `main` with a clear description of the change
 
 ## Questions?

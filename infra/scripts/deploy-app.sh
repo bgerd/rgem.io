@@ -12,10 +12,10 @@ if [[ ! -f "${ENV_FILE}" ]]; then
 fi
 source "${ENV_FILE}"
 
-echo "Deploying frontend for '${RGEM_ENV}'..."
+echo "Deploying app for '${RGEM_ENV}'..."
 
 # Build SPA
-pushd "${ROOT_DIR}/frontend"
+pushd "${ROOT_DIR}/app"
 npm install
 VITE_API_BASE_URL="https://${RGEM_API_HOST}" \
 VITE_WS_URL="wss://${RGEM_WS_HOST}" \
@@ -23,14 +23,14 @@ npm run build
 popd
 
 # Bucket name must match your SAM template and sam config
-BUCKET="rgem-${RGEM_ENV}-frontend-bucket"
+BUCKET="rgem-${RGEM_ENV}-app-bucket"
 
-aws s3 sync "${ROOT_DIR}/frontend/dist/" "s3://${BUCKET}/" --delete
+aws s3 sync "${ROOT_DIR}/app/dist/" "s3://${BUCKET}/" --delete
 
 # Get CloudFront distribution ID from CloudFormation output
 DIST_ID=$(aws cloudformation describe-stacks \
   --stack-name "rgem-${RGEM_ENV}" \
-  --query "Stacks[0].Outputs[?OutputKey=='FrontendDistributionId'].OutputValue" \
+  --query "Stacks[0].Outputs[?OutputKey=='AppDistributionId'].OutputValue" \
   --output text)
 
 aws cloudfront create-invalidation \

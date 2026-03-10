@@ -1,6 +1,6 @@
-# CLAUDE.md — virtual-rgem frontend
+# CLAUDE.md — virtual-rgem app
 
-Frontend-specific supplement to the [root CLAUDE.md](../CLAUDE.md).
+App-specific supplement to the [root CLAUDE.md](../CLAUDE.md).
 
 For comment conventions, message protocol, environment table, naming rules, and deployment, see the root file.
 

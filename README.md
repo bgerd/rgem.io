@@ -37,7 +37,7 @@ Contributions and questions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.m
 ## Architecture
 
 ```
-  Hardware (NeoTrellis)              Frontend (React)
+  Hardware (NeoTrellis)              App (React)
          |                                |
          |  HTTP POST                     |  WebSocket
          v                                v
@@ -49,7 +49,7 @@ Contributions and questions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.m
 
 The system has three components:
 
-- **Frontend** (`frontend/`) — React + TypeScript + Vite web app. Connects to the backend over WebSocket, renders the 4x4 grid, and sends click/double-click events.
+- **App** (`app/`) — React + TypeScript + Vite web app. Connects to the backend over WebSocket, renders the 4x4 grid, and sends click/double-click events.
 - **Backend** (`backend/` + `template.yaml`) — AWS SAM stack with WebSocket and HTTP API Gateways, Lambda functions (Node.js 20, ES modules), a shared Lambda layer, and two DynamoDB tables (connection tracking and grid state). Broadcasts state updates to all clients subscribed to the same "gem."
 - **Hardware** (`device/`) — Arduino sketch for an Adafruit NeoTrellis M4 (SAMD21). Connects to WiFi, communicates with the backend over WebSocket, and displays the shared grid state on its 4x4 RGB button matrix.
 
@@ -65,7 +65,7 @@ The system has three components:
 
 | Component | Technologies |
 |-----------|-------------|
-| Frontend  | React 19, TypeScript, Vite |
+| App       | React 19, TypeScript, Vite |
 | Backend   | AWS Lambda (Node.js 20), API Gateway (HTTP + WebSocket), DynamoDB, SAM/CloudFormation |
 | Hardware  | Arduino (SAMD21), Adafruit NeoTrellis, ArduinoJson |
 
@@ -83,8 +83,8 @@ The system has three components:
 │   ├── schedhb/                <-- scheduled heartbeat function
 │   ├── layers/common/nodejs/   <-- shared Lambda layer (DDB, WS, gem-state utils)
 │   └── update-dependencies.sh  <-- updates node_modules across handlers
+├── app/                        <-- React + TypeScript app SPA
 ├── device/                     <-- Arduino hardware sketches
-├── frontend/                   <-- React + TypeScript frontend
 ├── infra/                      <-- deployment scripts
 ├── samconfig.toml.example      <-- SAM CLI environment config template (copy to samconfig.toml)
 └── template.yaml               <-- SAM template for Lambda + DynamoDB
@@ -123,7 +123,7 @@ Run once after cloning (or to switch environments):
 ./configure.sh dev      # or stage, prod
 ```
 
-This generates gitignored config files (`.env`, `frontend/.env`, `device/core/config.h`) that all other scripts and builds consume.
+This generates gitignored config files (`.env`, `app/.env`, `device/core/config.h`) that all other scripts and builds consume.
 
 #### 3. Lint
 ```bash
@@ -138,10 +138,10 @@ sam validate --lint
 
 > **Note:** If the structure of `gemState` changes, you must clear the `GEM_STATE_TABLE` in DynamoDB before deploying.
 
-#### 5. Deploy frontend
+#### 5. Deploy app
 
 ```bash
-./infra/scripts/deploy-frontend.sh
+./infra/scripts/deploy-app.sh
 ```
 
 #### 6. Tear down an environment (optional)
@@ -156,25 +156,25 @@ This empties S3 buckets, disables CloudFront, and deletes the CloudFormation sta
 
 # Testing
 
-## Frontend
+## App
 Navigate your browser to
 - Dev: [app-dev.rgem.io](app-dev.rgem.io)
 - Stage: [app-stage.rgem.io](app-stage.rgem.io)
 - Prod: [app.rgem.io](app.rgem.io)
 
-## Frontend (Unit Tests)
+## App (Unit Tests)
 
 ```bash
-cd frontend
+cd app
 npm run test
 ```
 
-## Frontend (Local)
+## App (Local)
 
-After running `./configure.sh <env>`, `frontend/.env` is generated with the correct `VITE_WS_URL`. Start the dev server:
+After running `./configure.sh <env>`, `app/.env` is generated with the correct `VITE_WS_URL`. Start the dev server:
 
 ```bash
-cd frontend
+cd app
 npm run dev
 ```
 

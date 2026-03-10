@@ -34,8 +34,8 @@ RGEM_WS_HOST=${WS_HOST}
 RGEM_API_HOST=${API_HOST}
 EOF
 
-# 2. frontend/.env — consumed by Vite at dev/build time
-cat > "${SCRIPT_DIR}/frontend/.env" <<EOF
+# 2. app/.env — consumed by Vite at dev/build time
+cat > "${SCRIPT_DIR}/app/.env" <<EOF
 VITE_WS_URL=wss://${WS_HOST}
 VITE_API_URL=https://${API_HOST}
 EOF
@@ -52,5 +52,5 @@ EOF
 
 echo "Configured for '${ENV_NAME}':"
 echo "  .env"
-echo "  frontend/.env"
+echo "  app/.env"
 echo "  device/core/config.h"

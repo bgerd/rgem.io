@@ -14,7 +14,7 @@ fi
 source "${ENV_FILE}"
 
 STACK_NAME="rgem-${RGEM_ENV}"
-BUCKET="rgem-${RGEM_ENV}-frontend-bucket"
+APP_BUCKET="rgem-${RGEM_ENV}-app-bucket"
 
 echo "=== Force-delete CloudFormation stack ==="
 echo "  Environment : ${RGEM_ENV}"
@@ -36,27 +36,26 @@ if ! aws cloudformation describe-stacks \
   exit 0
 fi
 
-# Disable CloudFront distribution — CloudFormation cannot delete an enabled distribution.
-# Fetch the distribution ID from CloudFormation outputs.
-DIST_ID=$(aws cloudformation describe-stacks \
-  --stack-name "${STACK_NAME}" \
-  --region "${REGION}" \
-  --query "Stacks[0].Outputs[?OutputKey=='FrontendDistributionId'].OutputValue" \
-  --output text 2>/dev/null || true)
+# Helper: disable a CloudFront distribution by ID.
+# CloudFormation cannot delete an enabled distribution.
+disable_distribution() {
+  local dist_id="$1"
 
-if [[ -n "${DIST_ID}" && "${DIST_ID}" != "None" ]]; then
-  echo "Disabling CloudFront distribution ${DIST_ID}..."
+  if [[ -z "${dist_id}" || "${dist_id}" == "None" ]]; then
+    echo "No distribution ID provided; skipping disable step."
+    return
+  fi
 
-  # Get the current distribution config and ETag
+  echo "Disabling CloudFront distribution ${dist_id}..."
+
   DIST_CONFIG_JSON=$(aws cloudfront get-distribution-config \
-    --id "${DIST_ID}" \
+    --id "${dist_id}" \
     --output json)
 
   ETAG=$(echo "${DIST_CONFIG_JSON}" | python3 -c "import sys,json; print(json.load(sys.stdin)['ETag'])")
   ENABLED=$(echo "${DIST_CONFIG_JSON}" | python3 -c "import sys,json; print(json.load(sys.stdin)['DistributionConfig']['Enabled'])")
 
   if [[ "${ENABLED}" == "True" ]]; then
-    # Set Enabled to false and update the distribution
     UPDATED_CONFIG=$(echo "${DIST_CONFIG_JSON}" | python3 -c "
 import sys, json
 data = json.load(sys.stdin)
@@ -65,24 +64,31 @@ config['Enabled'] = False
 print(json.dumps(config))
 ")
     aws cloudfront update-distribution \
-      --id "${DIST_ID}" \
+      --id "${dist_id}" \
       --if-match "${ETAG}" \
       --distribution-config "${UPDATED_CONFIG}" \
       > /dev/null
 
     echo "Waiting for CloudFront distribution to reach 'Deployed' state (this may take several minutes)..."
-    aws cloudfront wait distribution-deployed --id "${DIST_ID}"
-    echo "CloudFront distribution disabled."
+    aws cloudfront wait distribution-deployed --id "${dist_id}"
+    echo "CloudFront distribution ${dist_id} disabled."
   else
-    echo "CloudFront distribution already disabled."
+    echo "CloudFront distribution ${dist_id} already disabled."
   fi
-else
-  echo "No CloudFront distribution found in stack outputs; skipping disable step."
-fi
+}
 
-# Empty the frontend S3 bucket
-echo "Emptying S3 bucket ${BUCKET}..."
-aws s3 rm "s3://${BUCKET}" --recursive 2>/dev/null || echo "Bucket ${BUCKET} not found or already empty; continuing."
+# Disable the app CloudFront distribution
+APP_DIST_ID=$(aws cloudformation describe-stacks \
+  --stack-name "${STACK_NAME}" \
+  --region "${REGION}" \
+  --query "Stacks[0].Outputs[?OutputKey=='AppDistributionId'].OutputValue" \
+  --output text 2>/dev/null || true)
+
+disable_distribution "${APP_DIST_ID}"
+
+# Empty the app S3 bucket
+echo "Emptying S3 bucket ${APP_BUCKET}..."
+aws s3 rm "s3://${APP_BUCKET}" --recursive 2>/dev/null || echo "Bucket ${APP_BUCKET} not found or already empty; continuing."
 
 # Delete the CloudFormation stack
 echo "Deleting stack ${STACK_NAME}..."
@@ -97,4 +103,4 @@ aws cloudformation wait stack-delete-complete \
 
 echo ""
 echo "Stack '${STACK_NAME}' deleted successfully."
-echo "You can now redeploy with deploy-backend.sh and deploy-frontend.sh."
+echo "You can now redeploy with deploy-backend.sh and deploy-app.sh."
