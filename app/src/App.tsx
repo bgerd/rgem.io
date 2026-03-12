@@ -11,6 +11,8 @@ import { decodeTimestampString, decodeGemStateString, createDefaultGrid } from "
 import { useRoute } from "./lib/useRoute";
 import { parseGemIdFromPathname } from "./lib/gem-id";
 
+const RECONNECT_TIMEOUT_MS = 15000;
+
 export const App: React.FC = () => {
 
   /////////////
@@ -348,7 +350,6 @@ export const App: React.FC = () => {
   // NOTE: readyState cycles CLOSED → CONNECTING → CLOSED on each WebSocketProvider backoff
   // retry. The reconnectTimerRef prevents restarting the timer on each cycle — it is only
   // started once per drop event and cancelled only if readyState returns to OPEN.
-  const RECONNECT_TIMEOUT_MS = 15000;
   useEffect(() => {
     const socketDown = readyState !== "OPEN";
     const atConnectedGem = gemId !== null && connectionStatus === "connected";
