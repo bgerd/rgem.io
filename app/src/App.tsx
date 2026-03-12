@@ -368,6 +368,13 @@ export const App: React.FC = () => {
         reconnectTimerRef.current = null;
       }
     }
+
+    return () => {
+      if (reconnectTimerRef.current !== null) {
+        clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
+    };
   }, [gemId, connectionStatus, readyState]);
 
   // NOTE: Show the overlay when actively connecting (any mode), or when at /{gemId} and
