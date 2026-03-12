@@ -1,11 +1,9 @@
 // src/components/RGemSelectorModal.tsx
-import React from "react";
+import React, { useState } from "react";
+import { isValidGemId } from "../lib/gem-id";
 
 export type RGemSelectorModalProps = {
-  rgemIds: string[];
-  selectedRgemId: string | null;
-  onSelectRgemId: (id: string) => void;
-  onConnect: () => void;
+  onSubmit: (gemId: string) => void;
   isConnecting: boolean;
   error?: string | null;
 };
@@ -13,25 +11,41 @@ export type RGemSelectorModalProps = {
 /**
  * RGemSelectorModal
  *
- * A simple, stateless modal for choosing an RGEM ID and initiating a connection.
+ * A modal for entering a Gem ID and initiating a connection.
  * It does NOT know anything about grid state or WebSockets.
  */
 export const RGemSelectorModal: React.FC<RGemSelectorModalProps> = ({
-  rgemIds,
-  selectedRgemId,
-  onSelectRgemId,
-  onConnect,
+  onSubmit,
   isConnecting,
   error,
 }) => {
-  const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const value = e.target.value || null;
-    if (value) {
-      onSelectRgemId(value);
+  const [inputValue, setInputValue] = useState<string>("");
+  const [validationError, setValidationError] = useState<string | null>(null);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInputValue(e.target.value);
+    setValidationError(null);
+  };
+
+  const handleSubmit = () => {
+    const trimmed = inputValue.trim();
+    if (!isValidGemId(trimmed)) {
+      setValidationError(
+        "Gem ID can only contain letters, numbers, and hyphens (max 24 characters)"
+      );
+      return;
+    }
+    onSubmit(trimmed);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      handleSubmit();
     }
   };
 
-  const canConnect = !!selectedRgemId && !isConnecting;
+  const displayError = validationError ?? error;
+  const canConnect = inputValue.trim().length > 0 && !validationError && !isConnecting;
 
   return (
     <div className="rgem-modal-backdrop" aria-modal="true" role="dialog">
@@ -39,28 +53,24 @@ export const RGemSelectorModal: React.FC<RGemSelectorModalProps> = ({
         <h2 className="rgem-modal-title">Connect to an RGEM</h2>
 
         <label className="rgem-modal-label">
-          Select RGEM:
-          <select
-            className="rgem-modal-select"
-            value={selectedRgemId ?? ""}
+          Gem ID:
+          <input
+            type="text"
+            className="rgem-modal-input"
+            value={inputValue}
             onChange={handleChange}
+            onKeyDown={handleKeyDown}
             disabled={isConnecting}
-          >
-            <option value="">-- Choose an RGEM --</option>
-            {rgemIds.map((id) => (
-              <option key={id} value={id}>
-                {id}
-              </option>
-            ))}
-          </select>
+            placeholder="e.g. test-1"
+          />
         </label>
 
-        {error && <p className="rgem-modal-error">{error}</p>}
+        {displayError && <p className="rgem-modal-error">{displayError}</p>}
 
         <button
           type="button"
           className="rgem-modal-button"
-          onClick={onConnect}
+          onClick={handleSubmit}
           disabled={!canConnect}
         >
           {isConnecting ? "Connecting..." : "Connect"}

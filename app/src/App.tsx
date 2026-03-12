@@ -10,8 +10,6 @@ import type {
 import { useWebSocket } from "./lib/WebSocketProvider";
 import { decodeTimestampString, decodeGemStateString, createDefaultGrid } from "./lib/gem-state";
 
-// Hard-coded RGEM IDs for now.
-const RGEM_IDS: string[] = ["test-1", "test-2", "default"];
 
 export const App: React.FC = () => {
 
@@ -189,10 +187,11 @@ export const App: React.FC = () => {
 
   }
 
-  // Handle a click on "Connect" in the RgemSelectorModal
-  // Attempts to connect to the selected RGEM ID
-  const handleConnect = async () => {
-    if (!selectedRgemIdRef.current) return;
+    // Handle a submit from RGemSelectorModal with a validated gemId string
+  // Attempts to connect to the given RGEM ID
+  const handleConnect = async (gemId: string) => {
+    selectedRgemIdRef.current = gemId;
+    setSelectedRgemId(gemId);
 
     setConnectionError(null);
     setConnectionStatus("connecting");
@@ -300,10 +299,12 @@ export const App: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [closeSocket]);
 
-  // Determines visibility of LoadingOverlay
-  const isConnecting = (connectionStatus === "connecting"
-    || readyState === "CONNECTING"
-    || readyState === "CLOSED");
+  // NOTE: Show the overlay when the user has clicked Connect (connectionStatus === "connecting"),
+  // OR when in operation mode and the socket is reconnecting in the background.
+  // Gating by mode prevents the overlay from blocking the modal during initial mount
+  // (when readyState === "CLOSED" before any user action).
+  const showOverlay = connectionStatus === "connecting"
+    || (mode === "operation" && (readyState === "CONNECTING" || readyState === "CLOSED"));
 
   return (
     <div className="rgem-app-root">
@@ -318,17 +319,17 @@ export const App: React.FC = () => {
       {/* Configuration mode: show selector modal over the grid */}
       {mode === "configuration" && (
         <RGemSelectorModal
-          rgemIds={RGEM_IDS}
-          selectedRgemId={selectedRgemId}
-          onSelectRgemId={setSelectedRgemId}
-          onConnect={handleConnect}
-          isConnecting={isConnecting}
+          onSubmit={handleConnect}
+          // NOTE: Pass connectionStatus directly (not isConnecting) so the modal input
+          // is only disabled during an active user-initiated connect, not during the
+          // background socket setup that happens on mount (readyState === "CLOSED").
+          isConnecting={connectionStatus === "connecting"}
           error={connectionError}
         />
       )}
 
       {/* Connecting overlay */}
-      <LoadingOverlay isVisible={isConnecting} message="Connecting to RGEM…" />
+      <LoadingOverlay isVisible={showOverlay} message="Connecting to RGEM…" />
     </div>
   );
 };
