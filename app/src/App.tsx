@@ -3,23 +3,26 @@ import { RGemGridPage } from "./components/RGemGridPage";
 import { RGemSelectorModal } from "./components/RGemSelectorModal";
 import { LoadingOverlay } from "./components/LoadingOverlay";
 import type {
-  AppMode,
   ConnectionStatus,
   GridState,
 } from "./types/grid";
 import { useWebSocket } from "./lib/WebSocketProvider";
 import { decodeTimestampString, decodeGemStateString, createDefaultGrid } from "./lib/gem-state";
-
+import { useRoute } from "./lib/useRoute";
+import { parseGemIdFromPathname } from "./lib/gem-id";
 
 export const App: React.FC = () => {
 
   /////////////
+  // URL-based routing
+  const pathname = useRoute();
+  const gemId = parseGemIdFromPathname(pathname);
+
+  /////////////
   // Application state
-  const [mode, setMode] = useState<AppMode>("configuration");
   const [connectionStatus, setConnectionStatus] =
     useState<ConnectionStatus>("idle");
-  const [connectionError, setConnectionError] = useState<string | null>(null);
-  const [selectedRgemId, setSelectedRgemId] = useState<string | null>(null);
+  const [modalError, setModalError] = useState<string | null>(null);
   const [gridState, setGridState] = useState<GridState>(() =>
     createDefaultGrid()
   );
@@ -47,29 +50,31 @@ export const App: React.FC = () => {
   const latestUpdateTsRef = useRef<number | null>(null);
 
   // Ref-to-latest pattern: keep latest state in a ref to avoid stale closures in long-lived callbacks.
+  // NOTE: Synced from URL-derived gemId in the routing effect rather than from state.
   const selectedRgemIdRef = useRef<string | null>(null);
-  useEffect(() => {
-    selectedRgemIdRef.current = selectedRgemId;
-  }, [selectedRgemId]);
+
+  // Holds the active background-reconnect timeout handle.
+  // A ref is used so the timer is not restarted on each WebSocketProvider backoff cycle
+  // (CLOSED → CONNECTING → CLOSED), which would prevent it from ever firing.
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /////////////
   // Application functions
-  const ensureConnected = async (why: string) : Promise<void> => {
+  const ensureConnected = async (why: string): Promise<void> => {
     console.log(`[App ensureConnected] start(${why}) `);
 
     // Note: We opt to use a ref to avoid stale closures and
     // reregistering ensureConnected as a callback on every selectedRgemId change.
     const currentRgemId = selectedRgemIdRef.current;
     if (currentRgemId === null) {
-      console.log( "... No RGEM selected, opening socket only");
+      console.log("... No RGEM selected, opening socket only");
       await openSocket(why);
     } else {
       console.log("... RGEM selected, connecting to RGEM");
       await connectToRgem(why);
     }
     console.log(`[App ensureConnected] done(${why})`);
-
-  }
+  };
 
   const connectToRgem = async (why: string) => {
     console.log(`[App connectToRgem] start(${why})`);
@@ -96,7 +101,7 @@ export const App: React.FC = () => {
 
         // TODO: Reimplement JSON-based messaging protocol as a more efficient binary protocol (encoded as base64 for API Gateway transport) to reduce message size and parsing overhead on the client.
         const typed = msg as { type?: string; gemState?: string; ts?: string };
-        
+
         // Guard: only handle the first valid update
         if (typed.type === "update" && typeof typed.gemState === "string" && typeof typed.ts === "string") {
 
@@ -105,7 +110,7 @@ export const App: React.FC = () => {
 
           // Unsubscribe immediately since we only want the first update
           unsubscribeFirstUpdateHandler();
-          
+
           resolve(initialGrid);
         }
         // NOTE:FIX: Ignore pong, hb, and other non-update messages silently.
@@ -127,7 +132,7 @@ export const App: React.FC = () => {
       const originalResolve = resolve;
       const originalReject = reject;
 
-      // Because closures capture variables by reference in JavaScript’s lexical scope,
+      // Because closures capture variables by reference in JavaScript's lexical scope,
       // we can reassign the local resolve/reject to wrapped versions that clear the timeout;
       // subsequent calls in this scope will invoke the wrappers.
       resolve = (value: GridState | PromiseLike<GridState>) => {
@@ -145,7 +150,7 @@ export const App: React.FC = () => {
       const initialGrid = await firstUpdatePromise;
       setGridState(initialGrid);
     } catch (err) {
-      
+
       // TODO: Revisit FIRST_UPDATE_TIMEOUT_MS strategy based on UX testing.
       console.error("... First update did not arrive:", err);
       // Strategy choice:
@@ -161,7 +166,7 @@ export const App: React.FC = () => {
     const unsubscribeUpdateHandler = addMessageHandler((msg) => {
 
       const typed = msg as { type?: string; gemState?: string; ts?: string };
-      
+
       // Guard: only process valid update messages
       if (typed.type === "update" && typeof typed.gemState === "string" && typeof typed.ts === "string") {
 
@@ -170,10 +175,10 @@ export const App: React.FC = () => {
           latestUpdateTsRef.current = timestamp;
           const nextGrid = decodeGemStateString(typed.gemState);
           setGridState(nextGrid);
-          return; 
+          return;
         } else {
           console.warn(`Ignoring out-of-order update (ts: ${timestamp} <= latest: ${latestUpdateTsRef.current})`);
-          return; 
+          return;
         }
       } else if (typed.type === "pong" || typed.type === "hb") {
         // Ignore pong messages in the update handler; they are for connection health monitoring.
@@ -184,29 +189,65 @@ export const App: React.FC = () => {
     unsubscribeUpdateHandlerRef.current = unsubscribeUpdateHandler;
 
     console.log(`[App connectToRgem] done(${why})`);
+  };
 
-  }
-
-    // Handle a submit from RGemSelectorModal with a validated gemId string
-  // Attempts to connect to the given RGEM ID
-  const handleConnect = async (gemId: string) => {
+  /////////////
+  // Routing effect: sync ref, redirect invalid paths, auto-connect on valid gemId
+  useEffect(() => {
+    // Sync ref immediately so connectToRgem reads the correct gemId without a stale closure.
     selectedRgemIdRef.current = gemId;
-    setSelectedRgemId(gemId);
 
-    setConnectionError(null);
-    setConnectionStatus("connecting");
-
-    try {
-      await connectToRgem("handle_connect");
-      setConnectionStatus("connected");
-      setMode("operation"); // configuration -> operation
-    } catch (err) {
-      // TODO: Revisit appropriate error handling strategy
-      console.error("Failed to connect to RGEM:", err);
-      setConnectionStatus("error");
-      setConnectionError("Unable to connect. Please try again.");
-      setMode("configuration");
+    // Invalid path (e.g. /bad!!id): redirect to / and surface a validation error via React state.
+    // NOTE: history.state cannot be used here because gemId === null on the first render
+    // (invalid path fails parseGemIdFromPathname), so the modal is already mounted before
+    // this effect runs — its lazy useState initializer would read history.state too early.
+    if (pathname !== "/" && gemId === null) {
+      setModalError("Gem ID can only contain letters, numbers, and hyphens (max 24 characters)");
+      history.replaceState(null, "", "/");
+      // NOTE: replaceState does not fire popstate. Dispatch manually to trigger useRoute re-read.
+      window.dispatchEvent(new PopStateEvent("popstate"));
+      return;
     }
+
+    if (gemId === null) {
+      // At /: clear any routing error and reset connection status.
+      setModalError(null);
+      setConnectionStatus("idle");
+      return;
+    }
+
+    // Valid gemId in URL: auto-connect
+    // NOTE: stale flag prevents the failure handler from redirecting to / if this effect
+    // is cleaned up before the async catch fires. This handles two cases:
+    // 1. React StrictMode double-mount in dev: the first mount's socket is torn down by
+    //    the lifecycle cleanup, causing connectToRgem to reject. Without stale guard,
+    //    the catch would redirect to / before the second mount can reconnect successfully.
+    // 2. User navigates away mid-connect: the catch should not redirect if gemId has changed.
+    let stale = false;
+    setConnectionStatus("connecting");
+    void connectToRgem("url_mount")
+      .then(() => {
+        if (!stale) setConnectionStatus("connected");
+      })
+      .catch(() => {
+        if (stale) return;
+        // NOTE: On failure, redirect to / with error state so the modal can pre-populate
+        // the input and show a contextual error message on mount.
+        history.replaceState({ gemId, error: "connection_failed" }, "", "/");
+        window.dispatchEvent(new PopStateEvent("popstate"));
+        setConnectionStatus("idle");
+      });
+    return () => { stale = true; };
+    // NOTE:FIX:LINT react-hooks/exhaustive-deps — connectToRgem is intentionally omitted.
+    // It uses the ref-to-latest pattern (selectedRgemIdRef) so the stale closure is safe.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gemId]);
+
+  // Handle modal submit: push URL so useRoute picks up the new gemId, triggering the routing effect.
+  const handleModalSubmit = (id: string) => {
+    history.pushState(null, "", `/${id}`);
+    // NOTE: pushState does not fire popstate. Dispatch manually to trigger useRoute re-read.
+    window.dispatchEvent(new PopStateEvent("popstate"));
   };
 
   // Handle a click on a grid cell in the RGemGridPage
@@ -249,19 +290,22 @@ export const App: React.FC = () => {
     const onOnline = () => void ensureConnected("online");
     const onOffline = () => closeSocket("offline");
 
-    // NOTE:FIX: Register event listeners unconditionally before attempting connection.                                                                                                   
-    // Previously these were inside .then() after app_mount, as a workaround until                                                                                                      
-    // we fixed openSocket and closeSocket to be idempotent and resilient to multiple calls.                                                                                              
-    // The .then() gate meant listeners were never attached if the initial connection failed,                                                                                           
-    // preventing auto-recovery on visibility/online events.   
+    // NOTE:FIX: Register event listeners unconditionally before attempting connection.
+    // Previously these were inside .then() after app_mount, as a workaround until
+    // we fixed openSocket and closeSocket to be idempotent and resilient to multiple calls.
+    // The .then() gate meant listeners were never attached if the initial connection failed,
+    // preventing auto-recovery on visibility/online events.
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("pagehide", onPageHide);
     window.addEventListener("pageshow", onPageShow);
     window.addEventListener("online", onOnline);
     window.addEventListener("offline", onOffline);
 
-    void ensureConnected("app_mount").catch((err) =>
-      console.warn("[App] Initial connection failed, will retry on visibility/online:", err)
+    // NOTE: On mount, only open the socket. The routing effect (useEffect([gemId])) handles
+    // connectToRgem when a gemId is present in the URL. Calling ensureConnected here would
+    // duplicate the hello/first-update flow and register duplicate update handlers.
+    void openSocket("app_mount").catch((err) =>
+      console.warn("[App] Initial socket open failed, will retry on visibility/online:", err)
     );
 
     // Handle ? key to toggle cell ID visibility
@@ -292,23 +336,49 @@ export const App: React.FC = () => {
 
       window.removeEventListener("keydown", handleKeyDown);
     };
-    // NOTE:FIX:LINT react-hooks/exhaustive-deps — ensureConnected is intentionally omitted.
-    // It uses the ref-to-latest pattern (selectedRgemIdRef) so the stale closure is safe.
-    // Adding it would cause the effect to re-run every render, re-registering all event listeners.
+    // NOTE:FIX:LINT react-hooks/exhaustive-deps — ensureConnected and openSocket are
+    // intentionally omitted. Both use the ref-to-latest pattern (selectedRgemIdRef) so
+    // stale closures are safe. Adding them would re-register all event listeners on every render.
     // closeSocket is stable (from useMemo) and included.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [closeSocket]);
 
-  // NOTE: Show the overlay when the user has clicked Connect (connectionStatus === "connecting"),
-  // OR when in operation mode and the socket is reconnecting in the background.
-  // Gating by mode prevents the overlay from blocking the modal during initial mount
-  // (when readyState === "CLOSED" before any user action).
+  // Background reconnect timeout: if already connected at /{gemId} and the socket drops,
+  // redirect to / with an error after RECONNECT_TIMEOUT_MS.
+  // NOTE: readyState cycles CLOSED → CONNECTING → CLOSED on each WebSocketProvider backoff
+  // retry. The reconnectTimerRef prevents restarting the timer on each cycle — it is only
+  // started once per drop event and cancelled only if readyState returns to OPEN.
+  const RECONNECT_TIMEOUT_MS = 15000;
+  useEffect(() => {
+    const socketDown = readyState !== "OPEN";
+    const atConnectedGem = gemId !== null && connectionStatus === "connected";
+
+    if (atConnectedGem && socketDown) {
+      if (reconnectTimerRef.current !== null) return; // timer already running — don't restart
+      reconnectTimerRef.current = setTimeout(() => {
+        reconnectTimerRef.current = null;
+        history.replaceState({ gemId, error: "connection_failed" }, "", "/");
+        window.dispatchEvent(new PopStateEvent("popstate"));
+        setConnectionStatus("idle");
+      }, RECONNECT_TIMEOUT_MS);
+    } else {
+      // Reconnected or navigated away — cancel any pending redirect
+      if (reconnectTimerRef.current !== null) {
+        clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
+    }
+  }, [gemId, connectionStatus, readyState]);
+
+  // NOTE: Show the overlay when actively connecting (any mode), or when at /{gemId} and
+  // the socket is reconnecting in the background. gemId === null (at /) is excluded to
+  // prevent the overlay from blocking the modal.
   const showOverlay = connectionStatus === "connecting"
-    || (mode === "operation" && (readyState === "CONNECTING" || readyState === "CLOSED"));
+    || (gemId !== null && (readyState === "CONNECTING" || readyState === "CLOSED"));
 
   return (
     <div className="rgem-app-root">
-      {/* Underlying grid is always rendered. Mode simply affects overlay. */}
+      {/* Underlying grid is always rendered. gemId presence determines modal visibility. */}
       <RGemGridPage
         cells={gridState}
         onCellClick={handleGridClick}
@@ -316,15 +386,13 @@ export const App: React.FC = () => {
         isLabelVisible={isCellIdVisible}
       />
 
-      {/* Configuration mode: show selector modal over the grid */}
-      {mode === "configuration" && (
+      {/* No gemId in URL: show selector modal */}
+      {gemId === null && (
         <RGemSelectorModal
-          onSubmit={handleConnect}
-          // NOTE: Pass connectionStatus directly (not isConnecting) so the modal input
-          // is only disabled during an active user-initiated connect, not during the
-          // background socket setup that happens on mount (readyState === "CLOSED").
+          onSubmit={handleModalSubmit}
+          // NOTE: Only disable during active user-initiated connect, not background socket setup.
           isConnecting={connectionStatus === "connecting"}
-          error={connectionError}
+          error={modalError}
         />
       )}
 
