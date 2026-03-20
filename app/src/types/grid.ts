@@ -1,8 +1,5 @@
 // src/types/grid.ts
 
-// Logical application modes
-export type AppMode = "configuration" | "operation";
-
 // Status of the RGEM "connection"
 export type ConnectionStatus = "idle" | "connecting" | "connected" | "error";
 

@@ -82,6 +82,13 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full workflow.
 - PascalCase components/types, camelCase variables/functions
 - ESLint flat config with react-hooks and react-refresh plugins
 
+### UX & Styling
+- All styles use the `.rgem-*` CSS class prefix — no unscoped selectors
+- **Match existing styling when adding or modifying UI elements.** New elements must use the established dark-theme palette (`#1f2933` modal background, `#111827` input background, `#4b5563` borders, `#f9fafb` text, `#2563eb` primary button) and follow existing spacing, border-radius, and font-size patterns from `app/src/styles/globals.css`.
+- Before adding a new CSS class, check `globals.css` for an existing class that can be reused or extended (e.g. new inputs should mirror `.rgem-modal-select`).
+- Do not introduce inline styles, CSS-in-JS, or additional stylesheets. All styles belong in `globals.css`.
+- Deviations from these defaults require explicit instruction.
+
 ### Arduino (C++)
 - UPPER_CASE constants, camelCase functions
 - Legacy `Td.` markers exist — migrate to `TODO:` when touching those files
