@@ -1,4 +1,5 @@
 // winc1500 lib
+// NOTE: WiFi101_Generic MUST be patched to make startProvision() a public function
 #include <WiFi101_Generic.h>
 
 // UDP lib (for MDNS)
