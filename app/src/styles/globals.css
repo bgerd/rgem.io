@@ -110,13 +110,15 @@ body {
   font-size: 14px;
 }
 
-.rgem-modal-select {
+.rgem-modal-select,
+.rgem-modal-input {
   margin-top: 4px;
   padding: 6px 8px;
   border-radius: 4px;
   border: 1px solid #4b5563;
   background-color: #111827;
   color: #f9fafb;
+  font-size: inherit;
 }
 
 .rgem-modal-button {
